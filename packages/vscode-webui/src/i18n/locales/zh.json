@@ -17,7 +17,8 @@
     "autoSave": {
       "title": "启用自动保存时 Pochi 无法正常工作。",
       "description": "Pochi 依赖待定的文件更改来显示编辑的差异，这需要禁用自动保存功能。"
-    }
+    },
+    "prompt": "询问任何问题..."
   },
   "workspace": {
     "required": "要使用 Pochi，请打开一个文件夹或工作区。"
