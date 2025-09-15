@@ -1,0 +1,11 @@
+chore(vscode-webui): clean i18n prompt placeholder improvements
+
+Apply improved i18n translations for prompt placeholder:
+- English: "Ask anything..." 
+- Japanese: "何でもお聞きください..." (polite/welcoming)
+- Korean: "무엇이든 물어보세요..." (natural Korean)
+- Chinese: "问我任何问题..." (conversational tone)
+
+This commit provides a clean implementation without merge complexity.
+
+Co-authored-by: Wei Zhang <zwpaper@users.noreply.github.com>
