@@ -32,6 +32,7 @@ import {
   findSuggestionMatch,
 } from "@tiptap/suggestion";
 import { ArrowRightToLine } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { ScrollArea } from "../ui/scroll-area";
 import { AutoCompleteExtension } from "./auto-completion/extension";
 import type { MentionListActions } from "./shared";
@@ -103,6 +104,8 @@ export function FormEditor({
   onFileDrop,
   messageContent = "",
 }: FormEditorProps) {
+  const { t } = useTranslation();
+
   const internalFormRef = useRef<HTMLFormElement>(null);
   const formRef = externalFormRef || internalFormRef;
   const [isAutoCompleteHintVisible, setIsAutoCompleteHintVisible] =
@@ -126,7 +129,7 @@ export function FormEditor({
         Paragraph,
         Text,
         Placeholder.configure({
-          placeholder: "Ask anything ...",
+          placeholder: t("placeholder.prompt"),
         }),
         CustomEnterKeyHandler(formRef),
         PromptFormMentionExtension.configure({
