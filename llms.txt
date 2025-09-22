@@ -291,9 +291,11 @@ Here is an example of a custom agent definition:
 
 ```markdown
 ---
-name: your-custom-agent-name
 description: Description of when this custom agent should be invoked
-tools: tool-1, tool-2, tool-3 # Optional - inherits all tools if omitted
+tools:
+  - tool-1
+  - tool-2
+  - tool-3
 ---
 
 Your custom agent's system prompt goes here. This can be multiple paragraphs
@@ -304,13 +306,15 @@ Include specific instructions, best practices, and any constraints
 the custom agent should follow.
 ```
 
+If the agent is saved as `my-agent.md` and the `name` attribute is omitted, `my-agent` will be used as the agent name.
+
 ### Configuration
 
 The frontmatter provides metadata for the custom agent:
 
-* `name` (required): A unique name for your agent.
+* `name` (optional): A unique name for your agent. If omitted, the filename (without the extension) is used as the name.
 * `description` (required): A short description of what the agent does. This is used to help Pochi decide when to use your agent.
-* `tools` (optional): A list of tools that the agent is allowed to use. If omitted, the agent inherits all available tools.
+* `tools` (optional): A list of tools that the agent is allowed to use. This can be a comma-separated string (e.g., `tool-1, tool-2`) or a YAML array. If omitted, the agent inherits all available tools.
 
 ### System Prompt
 
@@ -348,13 +352,47 @@ Here you will find highlights on features, enhancements, and bug fixes, plus ins
 
 ***
 
-## Sep 12, 2025
+### Sep 19, 2025
 
-### TL;DR
+#### TL;DR
+
+We are excited to introduce **Queued Messages** — type prompts in advance and stop waiting for Pochi to finish a task! We also launched a new [**Tutorials section**](https://docs.getpochi.com/tutorials/) with guides on **voice-driven development** and **Mermaid graphs**. Have tips or insights? Contribute your own via PRs! Plus, Pochi now supports more file types, and the CLI is friendlier and more interactive. ✨
+
+#### Features 🚀
+
+* **[Queued Messages](https://docs.getpochi.com/queued-messages/):** Don't wait around — `⌘/Ctrl + ↵` to line up your next prompt when Pochi is busy. [#286](https://github.com/TabbyML/pochi/pull/286)
+  <div className="w-4/7 md:ml-8 *:shadow-xl/30 *:rounded-lg">![Queued messages in prompt editor](../assets/images/queued-messages-1.png)</div>
+
+* **[Tutorials](https://docs.getpochi.com/tutorials/):** A new documentation hub to help you get more out of Pochi. This week: [voice-driven dev with Hex](https://docs.getpochi.com/tutorials/hex/), and [Mermaid graph communication](https://docs.getpochi.com/tutorials/mermaid-graph/).
+
+#### Enhancements ✨
+
+* **Multimedia file support:** Share not just images, but also PDFs and videos with Pochi. [#271](https://github.com/TabbyML/pochi/pull/271)
+
+* **Claude Code login:** The CLI now supports authentication with Claude Code. [#282](https://github.com/TabbyML/pochi/pull/282)
+
+* **Friendlier CLI experience:** Interactively pick auth vendors and navigate through tasks, get clearer help/error messages, and see upgrade notices on startup. [#287](https://github.com/TabbyML/pochi/pull/287), [#294](https://github.com/TabbyML/pochi/pull/294), [#308](https://github.com/TabbyML/pochi/pull/308), [#329](https://github.com/TabbyML/pochi/pull/329), [#357](https://github.com/TabbyML/pochi/pull/357)
+  <div className="w-4/7 md:ml-8 *:shadow-xl/30 *:rounded-lg">![Interactive task list in terminal](../assets/images/interactive-task-list.png)</div>
+
+* **Docs updates**: Added documentation for [queued messages](https://docs.getpochi.com/queued-messages/) and [tab completion model settings](https://docs.getpochi.com/tab-completion/#tab-completion-model-settings) and improved VS Code docs. [#317](https://github.com/TabbyML/pochi/pull/317), [#321](https://github.com/TabbyML/pochi/pull/321), [#365](https://github.com/TabbyML/pochi/pull/365)
+
+#### Bug fixes 🐛
+
+* **VS Code UX tweaks:** Unified drag-and-drop overlays with the prompt editor, fixed tooltip arrows, and ensured model selections are preserved with clear alerts when a model is unavailable. [#350](https://github.com/TabbyML/pochi/pull/350), [#316](https://github.com/TabbyML/pochi/pull/316), [#373](https://github.com/TabbyML/pochi/pull/373)
+
+#### New Contributors 🐾
+
+A belated shout-out to [@DESU-CLUB](https://github.com/DESU-CLUB) for their first contribution last week — and another one this week! 🥳
+
+***
+
+### Sep 12, 2025
+
+#### TL;DR
 
 This week we brought **custom agents** to life!🐣 Pochi **CLI is on npm**, `newTask` makes it simple to create and manage tasks right from the terminal, and Mermaid diagrams render beautifully inside the app. MCP interactions are smarter too, and the docs and UI keep getting smoother with every update. ✨
 
-### Features 🚀
+#### Features 🚀
 
 * **Custom Agents:** Define your own assistants in `.pochi/agents` using markdown. [#176](https://github.com/TabbyML/pochi/pull/176), [#181](https://github.com/TabbyML/pochi/pull/181)
 * **`newTask` in CLI:** Spin up tasks directly from the terminal, each with its dedicated agent. [#232](https://github.com/TabbyML/pochi/pull/232)
@@ -362,7 +400,7 @@ This week we brought **custom agents** to life!🐣 Pochi **CLI is on npm**, `ne
 
 <div className="w-4/7 md:ml-8 *:shadow-xl/30 *:rounded-lg">![Mermaid.js rendered diagram](../assets/images/mermaid-js-diagram.png)</div>
 
-### Enhancements ✨
+#### Enhancements ✨
 
 * **Pochi CLI on npm 📦:** `npm install -g pochi` and get it running! [#238](https://github.com/TabbyML/pochi/pull/238)
 * **Custom models for completion:** Use your own models for code completion in VS Code. [#251](https://github.com/TabbyML/pochi/pull/251)
@@ -374,26 +412,26 @@ This week we brought **custom agents** to life!🐣 Pochi **CLI is on npm**, `ne
 * **VS Code UI polish**: Autocomplete mention list is responsive and tabbable, workflow list is collapsible and better spaced. [#215](https://github.com/TabbyML/pochi/pull/215), [#204](https://github.com/TabbyML/pochi/pull/204), [#230](https://github.com/TabbyML/pochi/pull/230), [#228](https://github.com/TabbyML/pochi/pull/228), [#242](https://github.com/TabbyML/pochi/pull/242)
 * **Docs updates:** Added checkpoint feature and updated GitHub integration docs with API key setup. [#203](https://github.com/TabbyML/pochi/pull/203), [#262](https://github.com/TabbyML/pochi/pull/262)
 
-### Bug fixes 🐛
+#### Bug fixes 🐛
 
 * **Scoped replies:** Pochi only responds when you start a comment with `/pochi`. [#202](https://github.com/TabbyML/pochi/pull/202)
 
 ***
 
-## Sep 5, 2025
+### Sep 5, 2025
 
-### TL;DR
+#### TL;DR
 
 We had a massive week — **62 PRs shipped** 🎉!
 
 Pochi can now reply to you right in **GitHub comments & issues**, the interface speaks more languages with new **i18n support**, and we rolled out a sleeker, more powerful **background job system**. On top of that, the **CLI** got smarter, **autocomplete** got friendlier, and the **docs** got a glow-up!
 
-### Features 🚀
+#### Features 🚀
 
 * **GitHub Action integration:** Pochi now lives in your PR comments / issues! Ask for help in a PR with `/pochi`. [#76](https://github.com/TabbyML/pochi/pull/76)
 * **Internationalization (i18n):** The VS Code extension now supports 🇺🇸 🇨🇳 🇯🇵 🇰🇷. Want your language included? Open a PR! [#90](https://github.com/TabbyML/pochi/pull/90)
 
-### Enhancements ✨
+#### Enhancements ✨
 
 * **CLI upgrades:** The Pochi CLI got a big boost this week!
   * Install via Homebrew 🍺 [#125](https://github.com/TabbyML/pochi/issues/125)
@@ -403,30 +441,30 @@ Pochi can now reply to you right in **GitHub comments & issues**, the interface 
 * **Autocomplete:** Pochi suggests relevant tools, functions, and variables to help you type prompts faster. [#89](https://github.com/TabbyML/pochi/pull/89)
 * **Documentation updates:** Refreshed CLI usage docs, expanded model provider configuration examples, and added Slack integration documentation. [#133](https://github.com/TabbyML/pochi/pull/133), [#141](https://github.com/TabbyML/pochi/pull/141), [#82](https://github.com/TabbyML/pochi/pull/82)
 
-### Bug Fixes 🐛
+#### Bug Fixes 🐛
 
 * **File writing reliability:** The CLI ensures directories exist before writing, so `writeToFile` tool won't fail. [#118](https://github.com/TabbyML/pochi/pull/118)
 * **Code completion fix:** Corrected how VS Code calculates the replacement range for suggestions, so completions insert correctly. [#131](https://github.com/TabbyML/pochi/pull/131)
 
-### New Contributors 🐾
+#### New Contributors 🐾
 
 [@karim-coder](https://github.com/karim-coder) made their first contribution this week! Welcome aboard! 🎉
 
 ***
 
-## Aug 29, 2025
+### Aug 29, 2025
 
-### TL;DR
+#### TL;DR
 
 This week we polished the VS Code extension with some **UX upgrades**, open-sourced the **Pochi CLI**, and did a few rounds of **codebase cleanup** to make contributing easier and friendlier for newcomers. We look forward to your first visit to the repo!
 
-### Enhancements ✨
+#### Enhancements ✨
 
 * **Drag & drop images:** Share visuals with Pochi in the VS Code chat just by dragging them in. [#64](https://github.com/TabbyML/pochi/pull/64)
 * **Improved docs:** Updated structure and added guidance on model settings for easier use. [#60](https://github.com/TabbyML/pochi/pull/60), [#63](https://github.com/TabbyML/pochi/pull/63) , [900d162](https://github.com/TabbyML/pochi/commit/900d1629c4e97833e24a4450c438a585dca583d4)
 * **Model pricing at your fingertips:** Check model costs directly in settings before choosing one. [#74](https://github.com/TabbyML/pochi/pull/74)
 
-### Bug Fixes 🐛
+#### Bug Fixes 🐛
 
 * **File search now correctly surfaces matching files:** Queries that used to return empty results will now behave as expected. [#79](https://github.com/TabbyML/pochi/pull/79)
 
@@ -745,7 +783,7 @@ Pochi allows you to configure any LLM provider that offers an OpenAI-compatible 
   "providers": {
     "provider-id": {
       "apiKey": "your_api_key",
-      "baseUrl": "https://api.provider.com/v1",
+      "baseURL": "https://api.provider.com/v1",
       "models": {
         "model-id": {
           // The contextWindow and maxTokens are optional right now, it's default set to 10k and 4096
@@ -768,7 +806,7 @@ Chutes provides access to various AI models through their API. To use Chutes, yo
   "providers": {
     "chutes": {
       "apiKey": "your_api_token",
-      "baseUrl": "https://llm.chutes.ai/v1",
+      "baseURL": "https://llm.chutes.ai/v1",
       "models": {
         "zai-org/GLM-4.5-FP8": {
           "name": "glm-4.5"
@@ -789,7 +827,7 @@ Cerebras provides AI models through their OpenAI-compatible API. To use Cerebras
   "providers": {
     "cerebras": {
       "apiKey": "your_api_key",
-      "baseUrl": "https://api.cerebras.ai/v1",
+      "baseURL": "https://api.cerebras.ai/v1",
       "models": {
         "llama3.1-8b": {
           "name": "llama-3.1-8b"
@@ -810,7 +848,7 @@ DeepInfra provides access to a wide range of AI models through their OpenAI-comp
   "providers": {
     "deepinfra": {
       "apiKey": "your_api_token",
-      "baseUrl": "https://api.deepinfra.com/v1/openai",
+      "baseURL": "https://api.deepinfra.com/v1/openai",
       "models": {
         "meta-llama/Llama-3.3-70B-Instruct": {
           "name": "llama-3.3-70b"
@@ -831,7 +869,7 @@ Groq is a cloud-based AI platform that provides fast inference for large languag
   "providers": {
     "groq": {
       "apiKey": "your_api_key",
-      "baseUrl": "https://api.groq.com/openai/v1",
+      "baseURL": "https://api.groq.com/openai/v1",
       "models": {
         "llama3-8b-8192": {
           "name": "llama-3-8b"
@@ -851,7 +889,7 @@ LM Studio is a local IDE application that allows you to run and experiment with 
   "$schema": "https://getpochi.com/config.schema.json",
   "providers": {
     "lmstudio": {
-      "baseUrl": "http://127.0.0.1:1234/v1",
+      "baseURL": "http://127.0.0.1:1234/v1",
       "models": {
         "gemma-2b-it-q4f32_1": {
           "name": "gemma-2b"
@@ -872,7 +910,7 @@ Mistral AI provides a range of powerful language models available through their 
   "providers": {
     "mistral": {
       "apiKey": "your_api_key",
-      "baseUrl": "https://api.mistral.ai/v1",
+      "baseURL": "https://api.mistral.ai/v1",
       "models": {
         "mistral-small-latest": {
           "name": "mistral-small"
@@ -892,7 +930,7 @@ Ollama is a tool that allows you to run large language models locally on your ma
   "$schema": "https://getpochi.com/config.schema.json",
   "providers": {
     "ollama": {
-      "baseUrl": "http://localhost:11434/v1",
+      "baseURL": "http://localhost:11434/v1",
       "models": {
         "llama3:8b": {
           "name": "llama-3-8b"
@@ -918,15 +956,41 @@ icon: "Shield"
 
 By default, all permissions in Pochi are enabled. You can customize these permissions at any time using the Auto-Approve settings.
 
-<p align="center">
+<div align="center">
   ![Auto Approve](../assets/images/auto-approve.png)
-</p>
+</div>
 
 * **Read**: Read the file content Pochi decides to look up for analyzing or completing tasks.
 * **Write**: Creates new files, edits existing code, generates boilerplate, and writes documentation.
 * **Execute**: Manages dependencies, runs builds, tests, and perform system operations.
 * **Use MCP**: Interacts with databases, APIs, and other external services to expand its capabilities with MCP server.
 * **Retry**: Automatically retries failed commands, code changes, and installations.
+
+
+# Queued Messages
+URL: /queued-messages
+Add tasks to a queue while Pochi is busy, ensuring a non-blocking experience.
+***
+
+title: Queued Messages
+description: Add tasks to a queue while Pochi is busy, ensuring a non-blocking experience.
+icon: "Layers"
+--------------
+
+# Queued Messages
+
+The Queued Messages feature allows you to add multiple messages to a queue, which are then combined into a single prompt for execution. This lets you build up a complex request in pieces, which is especially useful while Pochi is busy.
+
+<div align="center">
+  ![Queued Messages UI](../assets/images/queued-messages.png)
+</div>
+
+When Pochi is busy, you don't have to wait to give it your next instruction. Here’s what happens:
+
+1. **Queue with a Shortcut**: Type your prompt and press `Cmd+Enter` (`Ctrl+Enter` on Windows/Linux). Your message will be added directly to the queue.
+2. **See What's in Line**: The "Queued Messages" panel appears, showing you a list of all the tasks waiting to be executed.
+3. **Combined for Execution**: Once Pochi is ready, it will take all the messages from the queue, merge them into a single prompt, and then execute it.
+4. **Remove with a Click**: If you decide you don't need a task done anymore, just click the `X` next to it to remove it from the queue.
 
 
 # Rules
@@ -995,9 +1059,9 @@ Pochi also reads global rules defined in `~/.pochi/README.pochi.md`. These rules
 
 You can view current active rules in toolbar's token usage popover
 
-<p align="center">
+<div align="center">
   ![Token Usage](../assets/images/usage-token-popover.png)
-</p>
+</div>
 
 
 # Share
@@ -1018,9 +1082,9 @@ The **Share** feature in Pochi's toolbar allows you to share your current develo
   Shared conversations are publicly accessible to anyone with the link. Do not share sensitive information or private code.
 </Callout>
 
-<p align="center">
+<div align="center">
   ![Task Sharing](../assets/images/task-sharing.png)
-</p>
+</div>
 
 ### How it works
 
@@ -1113,9 +1177,9 @@ Pochi uses a state-of-the-art model that adapts to your coding patterns in real 
 drawing on recent edits, diagnostics, and surrounding context to generate helpful,
 relevant completions right in your editor.
 
-<p align="center">
+<div align="center">
   ![Tab completion showing inline suggestions](../assets/images/completion.png)
-</p>
+</div>
 
 ### Multi-Language Support
 
@@ -1148,9 +1212,36 @@ Works across popular programming languages including:
 | `Alt + ]`      | Next suggestion (if multiple available)     |
 | `Alt + [`      | Previous suggestion (if multiple available) |
 
+## Tab Completion Model Settings
+
+You can customize the code completion provider in your VS Code settings, allowing you to switch between different models, including those running on your local machine.
+
+By default, Pochi uses its own hosted code completion model. Alternatively, you can configure Pochi to use any OpenAI-compatible server that provides a Fill-in-the-Middle (FIM) completion model.
+
+Here is an example configuration for a local OpenAI-compatible server running `qwen3-coder-30b-a3b` on port 8000:
+
+```json
+  "pochi.advanced": {
+    "inlineCompletion": {
+      "provider": {
+        "type": "openai",
+        "baseURL": "http://127.0.0.1:8000/v1",
+        "apiKey": "",
+        "model": "qwen3-coder-30b-a3b",
+        "promptTemplate": "<|fim_prefix|>{{prefix}}<|fim_suffix|>{{suffix}}<|fim_middle|>"
+      }
+    }
+  },
+```
+
+* **baseURL**: The base URL of the OpenAI-compatible server.
+* **apiKey**: The API key for the server. If not set, Pochi will use the `POCHI_CODE_COMPLETION_OPENAI_API_KEY` environment variable. This can be left empty if the server does not require an API key.
+* **model**: The name of the FIM completion model to use.
+* **promptTemplate**: The prompt template for FIM completion. It must include `{{prefix}}` and `{{suffix}}` placeholders.
+
 ***
 
-**Need help?** Visit our [Community Support](/community-support) page or join our [Discord](https://discord.com/invite/tWF66yr8NQ) for assistance with Tab Completion features.
+**Need help?** Join our [Discord](http://getpochi.com/discord) for assistance with Tab Completion features.
 
 
 # Troubleshooting
@@ -1230,37 +1321,54 @@ Upon first launch, Pochi's Welcome page offers two ways to get started:
 * **Sign in to Pochi:** Click "Sign In" and authorize in your browser to use Pochi subscriptions, models, and cloud features.
 * **Bring Your Own Key (BYOK):** Use your own models by running `Pochi: Open Custom Model Settings` from the Command Palette. This opens `~/.pochi/config.jsonc` for you to add API keys. See [Models](/models) for details.
 
-<p align="center">![The Welcome page provides options to sign in or configure your own models.](../assets/images/welcome-page.png)</p>
+<div align="center">![The Welcome page provides options to sign in or configure your own models.](../assets/images/welcome-page.png)</div>
 
 ## Chat
 
-Access the Pochi chat panel via the Activity Bar icon or shortcut (macOS: `Cmd+L`, Win/Linux: `Ctrl+L`). This is your main interface for interacting with Pochi.
+Access the Pochi chat panel via the Activity Bar icon or shortcut (macOS: `Cmd+L`, Win/Linux: `Ctrl+L`). This is your main interface for interacting with Pochi. **Note:** An active workspace (i.e., an open folder) is required to use the chat.
 
 The panel's title bar includes actions for starting a new task and viewing all tasks.
 
-<p align="center">![The main Chat panel is where you interact with Pochi.](../assets/images/chat-page.png)</p>
+<div align="center">![The main Chat panel is where you interact with Pochi.](../assets/images/chat-page.png)</div>
 
-### Toolbox
+## Prompting
 
-The toolbox below the chat provides key features:
+The input box, located below the chat history, is where you'll compose your messages and control the chat.
 
-* **Top:** Auto-approve menu for autonomous tool use.
-* **Middle:** Chat input supporting text and images.
-* **Bottom:** Model selector, token usage, sharing, and image uploads.
+* **Auto-Approve Menu:** This menu at the top of the zone allows you to grant Pochi permission to use tools autonomously, streamlining the workflow.
+* **Todo List:** When Pochi creates a to-do list for a task, it will appear here, allowing you to track progress.
+* **Chat Input:** The main text area supports both text and image uploads. You can attach files by clicking the **paperclip icon** or by dragging and dropping them into the input area.
+* **Bottom Toolbar:** The toolbar at the very bottom provides several key functions:
+  * **Model Selector:** Choose which language model you want to interact with.
+  * **Token Usage & Compact Task:** Monitor the token count of your conversation. If the conversation becomes long, a **Compact Task** button will appear, allowing you to condense the history and save tokens.
+  * **Sharing:** Share your chat session with others (requires a Pochi account).
+  * **Submit/Stop Button:** The send button dynamically transforms into a stop button during message generation, allowing you to interrupt the AI at any time.
 
-<p align="center">
-  ![The chat toolbox provides access to key features like model selection and auto-approval.](../assets/images/home-page-toolbox.png)
-</p>
+<div align="center">
+  ![The Prompt Zone provides access to key features like model selection and auto-approval.](../assets/images/home-page-toolbox.png)
+</div>
 
 ## Tasks
 
-Task history is stored locally by default. Signing in to a Pochi account enables cloud storage, sharing, and team collaboration features. Be aware that clearing VS Code's extension data may erase local history.
+A chat session in Pochi is saved as a **Task**. You can view your entire task history from the task list page.
 
-<p align="center">![The Task List page shows your historical task sessions.](../assets/images/task-page.png)</p>
+Some AI-powered actions might generate a **Sub-task**, which is a new, focused chat session dedicated to a specific part of the original task.
+When you're in a sub-task, you'll see a "Back" button to navigate to the parent task, allowing you to maintain context while breaking down complex problems.
+By default sub-tasks are hidden in the task list.
+
+By default, task history is stored locally. Signing in to a Pochi account enables cloud storage for your tasks, along with sharing and team collaboration features.
+Be aware that clearing VS Code's extension data may erase your local task history.
+
+<div align="center">![The Task List page shows your historical task sessions.](../assets/images/task-page.png)</div>
 
 ## Troubleshooting
 
-Having issues? Check [Troubleshooting](/troubleshooting), or verify that your sign-in status and model configuration are valid.
+Having issues? Here are a few things to check:
+
+* **No Active Workspace:** Pochi requires an open folder to function correctly. Make sure you have a workspace open.
+* **Sign-in/Model Configuration:** Verify that you are either signed in to your Pochi account or have a valid API key configured in your `~/.pochi/config.jsonc`.
+
+For more help, check the full [Troubleshooting](/troubleshooting) page or join our community on [Discord](https://getpochi.com/discord).
 
 
 # Workflows
@@ -1330,3 +1438,240 @@ Once your workflows are set up, using them is straightforward:
 </div>
 
 *This video demonstrates how to use workflows in VS Code*
+
+
+# Connect to Tabby Server for Enhanced Enterprise Experience
+URL: /tutorials/connect-to-tabby-server
+
+***
+
+## title: Connect to Tabby Server for Enhanced Enterprise Experience
+
+# Connect to Tabby Server for Enhanced Enterprise Experience
+
+This tutorial will guide you through the process of connecting Pochi to your self-hosted Tabby server. By connecting Pochi to your self-hosted Tabby server, you can take advantage of several benefits, including centralized account management, self-hosted tracking, and the ability to use your own custom models.
+
+## Prerequisites
+
+Before you start, make sure you have a running Tabby server instance. If you don't have one, you can follow the instructions on the [Tabby website](https://tabby.tabbyml.com/) to set one up.
+
+## Configuration
+
+Pochi uses a configuration file to connect to different model providers. To connect to Tabby, you'll need to add a new provider configuration to your `~/.pochi/config.json` file.
+
+Here's a sample configuration for connecting to a Tabby server:
+
+```jsonc
+{
+    "kind": "openai",
+    "id": "tabby",
+    "baseURL": "https://demo.tabbyml.com/v1",
+    "apiKey": "YOUR_AUTH_TOKEN",
+    "models": [
+        {
+            "id": "default",
+            // This flag is important for Tabby to work properly with Pochi
+            "useToolCallMiddleware": true
+        }
+    ]
+}
+```
+
+### Parameters
+
+You'll need to change the following parameters in the configuration:
+
+* `baseURL`: Change this to the URL of your Tabby server instance.
+* `apiKey`: Change this to your own auth token from the Tabby UI. You can find your token in the "Token" section of the Tabby admin panel, as shown in the screenshot below.
+
+<div align="center">
+  ![Tabby Auth Token](./images/tabby-auth-token.png)
+</div>
+
+## Conclusion
+
+Once you have updated the configuration file, Pochi will be able to connect to your Tabby server and use the models you have configured.
+
+
+# Voice-Driven Development with Hex and Pochi
+URL: /tutorials/hex
+
+***
+
+## title: 'Voice-Driven Development with Hex and Pochi'
+
+# Voice-Driven Development with Hex and Pochi
+
+This tutorial guides you through setting up an efficient, voice-driven development workflow by combining two powerful tools: **[Hex](https://github.com/kitlangton/Hex)** for local voice transcription and **[Pochi](https://github.com/TabbyML/pochi)** as your AI coding assistant.
+
+This setup allows you to speak commands, have them transcribed into text by Hex, and then have Pochi execute those commands, creating a seamless, hands-free coding experience.
+
+### What You Will Learn
+
+* How to install and configure Hex for voice-to-text transcription.
+* How to integrate Hex with Pochi to create a voice-driven development workflow.
+* Tips for optimizing your setup for accuracy and efficiency.
+
+### Prerequisites
+
+* **Pochi**: You should have Pochi installed and running in your editor.
+* **Apple Silicon Mac**: Hex is currently available only for Macs with Apple Silicon.
+
+### How It Works
+
+* **Hex** listens to your voice and converts it into text using its own built-in transcription models.
+* **Pochi** takes the text generated by Hex as a command and processes it using its configured AI model.
+
+> **For a Fully Private Workflow**
+> This tutorial focuses on the voice input aspect. For complete privacy and offline use, you can configure Pochi to use a local Large Language Model (LLM). See Pochi's documentation on [model configuration](../../models) for more details.
+
+***
+
+## Step 1: Install and Configure Hex
+
+Hex is an open-source macOS app that records your voice via a hotkey and pastes the transcribed text into any application.
+
+1. **Download Hex**: Get the latest version from the [official releases page](https://hex-updates.s3.us-east-1.amazonaws.com/hex-latest.dmg).
+
+2. **Install and Grant Permissions**:
+   * Open the downloaded `.dmg` file and drag Hex into your `Applications` folder.
+   * On first launch, macOS will ask for **Microphone** and **Accessibility** permissions. You must grant these so Hex can record your voice and paste the text into Pochi's chat window.
+
+3. **Configure Hex Settings**:
+   Once installed, open Hex's preferences to fine-tune its behavior.
+
+   **A. Set Your Hotkey**
+   This is the key you'll press to activate Hex. Choose a key or combination that doesn't conflict with other apps. The `Ignore below` slider helps prevent accidental triggers from very short key presses.
+
+   ![Hex Hotkey Setting](./images/hotkey-setting.png)
+
+   Hex also supports two recording modes:
+
+   * **Press-and-hold**: Start recording when you press the hotkey, and stop when you release it.
+   * **Double-tap**: Double-tap the hotkey to lock recording, then tap it again to stop.
+
+   **B. Select Your Transcription Model**
+   Hex uses local models based on [WhisperKit](https://github.com/argmaxinc/WhisperKit) to ensure privacy and speed. You can choose a model that balances accuracy and performance for your needs.
+
+   ![Hex Transcription Model Settings](./images/transcription-model-setting.png)
+
+   * **Model Size**: Larger models (like `Large` at 1.5GB) offer higher accuracy but are slower and consume more resources. The `Small` model is faster but may be less accurate. A good starting point is the `Large` model if you prioritize accuracy.
+   * **Output Language**: You can select the language for your transcription, which is useful if you prefer to give commands in a language other than English.
+
+> **Note**: The first time you select a model, Hex will download and compile it. A process called `ANECompilerService` may cause high CPU usage during this one-time optimization step. This is normal.
+
+## Step 2: The Voice Coding Workflow in Action
+
+With Hex installed, let's try the workflow.
+
+1. **Open Pochi**: Launch Pochi's chat interface in your code editor.
+
+2. **Activate Hex**: Click inside Pochi's input box, then use the hotkey you configured for Hex. When Hex is actively listening, it will display a recording indicator on your screen.
+
+   ![Hex Recording Indicator](./images/recording-indicator.png)
+
+3. **Speak Your Command**: Clearly state the task you want Pochi to perform. For example:
+   > Write a TypeScript function that takes an array of strings and returns the longest one.
+
+4. **Transcription**: When you stop recording, Hex transcribes your speech and pastes the text into Pochi's input box.
+
+5. **Execution**: Pochi takes this text and sends it to its configured AI model for processing. The generated code or response appears in the chat.
+
+## Tips and Troubleshooting
+
+* **Inaccurate Transcription?**
+  In Hex settings, try selecting a larger transcription model for better accuracy.
+
+* **Need Help with Hex?**
+  For questions or feedback specifically about Hex, join their [Discord community](https://discord.gg/5UzVCqWmav).
+
+## Conclusion
+
+By combining Hex and Pochi, you've created a fast and efficient voice-powered programming environment. This setup gives you a modern, hands-free way to translate your ideas into code.
+
+
+# Tutorials
+URL: /tutorials
+
+***
+
+title: Tutorials
+icon: BookOpenText
+------------------
+
+# Tutorials
+
+Welcome to the Pochi tutorials section. Here you will find step-by-step guides to help you get the most out of Pochi.
+
+* [Voice-Driven Development with Hex and Pochi](./hex)
+* [Visual Communication with Mermaid Graphs](./mermaid-graph)
+
+
+# Visualizing the Dialogue: How Pochi Uses Mermaid Graphs to Communicate
+URL: /tutorials/mermaid-graph
+
+***
+
+## title: "Visualizing the Dialogue: How Pochi Uses Mermaid Graphs to Communicate"
+
+# Visualizing the Dialogue: How Pochi Uses Mermaid Graphs to Communicate
+
+When Pochi tackles a large-scale code change, a monologue of text and code is not an effective way to collaborate. To have a clear dialogue with you, Pochi translates its plans into **Mermaid graphs**.
+
+Think of these diagrams as Pochi's whiteboard, where it sketches out its ideas for you to review. It's a communication tool designed to turn a complex plan into a simple, visual conversation. This allows you to understand, approve, and guide Pochi's approach before it writes a single line of code.
+
+## A Visual Conversation for Complex Tasks
+
+Pochi automatically generates Mermaid graphs when it needs to discuss its plan for complex tasks, such as:
+
+* **Architectural Changes**: Showing how the overall structure of your application will be modified.
+* **Complex Refactoring**: Breaking down a large function or class into smaller pieces.
+* **New Feature Implementation**: Visualizing how a new feature will interact with existing components.
+
+## Example: Pochi Proposes a Complex Refactor
+
+When preparing for a significant refactoring, Pochi uses a diagram to discuss the proposed architecture with you. In this example, Pochi was asked to refactor a component for Server-Side Rendering (SSR). It first analyzed the code, then generated the following diagram to explain its findings and get your feedback.
+
+![Tool Invocation Architecture](./images/tool-invocation-architecture.png)
+
+This diagram provides a clear overview of the system, which was then used to formulate a refactoring plan. The analysis highlighted several key areas:
+
+### Core Components:
+
+* **ToolInvocationPart**: The main entry point that routes tools to the correct renderer.
+* **Tools Registry**: A static mapping of tool names to their corresponding React components.
+* **McpToolCall**: A specialized renderer for tools using the Model Context Protocol (MCP).
+* **Shared UI Components**: A library of reusable components like containers, icons, and badges.
+
+### SSR Challenges Identified:
+
+The diagram helped identify three major challenges for implementing SSR:
+
+1. **Client-Side State Dependencies**: Heavy reliance on React hooks (`useState`, `useCallback`) and context providers for managing the tool lifecycle, which are not available on the server.
+2. **Browser/Environment Dependencies**: Components with direct dependencies on browser-specific features like `XTerm.js`, VS Code APIs, and file system interactions.
+3. **Dynamic Component Resolution**: The architecture relies on a runtime tool registry and conditional rendering based on the tool's execution state, which is difficult to resolve on the server.
+
+By visualizing the architecture, Pochi enabled the user to quickly understand the problem and approve the proposed strategy.
+
+## Example: Pochi Clarifies Business Logic with a Flowchart
+
+For changes to business logic, a code diff can be hard to follow. Pochi uses flowcharts to walk you through the new logic step-by-step. When asked to modify a task persistence feature, Pochi generated this flowchart to explain the new process.
+
+![Task Persistence Flowchart](./images/persist-task-flow.png)
+
+This visual explanation makes it much easier to verify the correctness of the new logic:
+
+1. **Time Check**: The process starts with a throttling mechanism to prevent spamming the API.
+2. **API Call**: If the check passes, it queries messages and calls the persistence API.
+3. **Error Handling**: It includes a clear path for what happens if the API call fails.
+4. **State Update**: It shows how the local state is updated with a `shareId` upon success.
+
+This turns a code review into a collaborative check of the logic, ensuring you and Pochi are on the same page.
+
+## Conclusion: Your Dialogue with Pochi
+
+Mermaid graphs are more than just diagrams; they are the bridge for communication between you and Pochi. They transform a potential monologue of code into a clear, interactive dialogue about the best path forward.
+
+When you see Pochi generate a Mermaid graph, it's an invitation to collaborate. Take a moment to review it—your feedback is crucial for guiding the AI and ensuring the final result meets your exact expectations.
+
+And remember, this is a two-way conversation. If you ever feel that Pochi's plan is unclear, you can proactively ask it to generate a Mermaid graph. Just say, "Can you explain that with a Mermaid diagram?" This puts you in control, allowing you to request visual clarity whenever you need it.
