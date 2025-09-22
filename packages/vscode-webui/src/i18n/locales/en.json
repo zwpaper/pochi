@@ -16,7 +16,8 @@
     "autoSave": {
       "title": "Pochi doesn't work well with auto-save enabled.",
       "description": "Pochi relies on pending file changes to display diffs of its edits, which requires auto-save to be disabled."
-    }
+    },
+    "prompt": "Ask anything..."
   },
   "workspace": {
     "required": "To use Pochi, please open a folder or workspace."

@@ -212,8 +212,8 @@ export class GitHubManager {
   // Validation and parsing operations
   private checkPochiKeyword(): void {
     const body = this.payload.comment.body.trim();
-    if (!body.match(/(?:^|\s)\/pochi(?=$|\s)/)) {
-      throw new Error("Comments must mention `/pochi`");
+    if (!body.match(/(?:^|\s)\@pochi(?=$|\s)/)) {
+      throw new Error("Comments must mention `@pochi`");
     }
   }
 
@@ -233,9 +233,9 @@ export class GitHubManager {
   private parsePrompt() {
     const body = this.payload.comment.body.trim();
 
-    const prompt = body.replace(/^\/pochi\s*/, "").trim();
+    const prompt = body.replace(/^\@pochi\s*/, "").trim();
     if (!prompt) {
-      throw new Error("No query provided after `/pochi`");
+      throw new Error("No query provided after `@pochi`");
     }
 
     return prompt;
