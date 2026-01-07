@@ -130,12 +130,14 @@ jobs:
         uses: trstringer/manual-approval@v1
         with:
           secret: ${{ github.TOKEN }}
-          approvers: wsxiaoys,zwpaper
+          approvers: zwpaper
           minimum-approvals: 1
           issue-title: "Release patch release from ${{ steps.parse_version.outputs.version }} to ${{ steps.parse_version.outputs.main_branch }}"
           issue-body: |
             Please approve or deny the release of ${{ steps.parse_version.outputs.version }} to ${{ steps.parse_version.outputs.main_branch }}.
-            - Pull Request: ${{ github.event.issue.html_url }}
+            Pull Request: ${{ github.event.issue.html_url }}
+
+            Tips:
             - Approval keywords: approve, approved, lgtm, yes
             - Denied keywords: deny, denied, no
           exclude-workflow-initiator-as-approver: false
