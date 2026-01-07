@@ -101,7 +101,7 @@ jobs:
         if: steps.parse_version.outputs.parse_failed == 'false'
         uses: oven-sh/setup-bun@v2
 
-      - name: Cherry-pick and Release (Pre-branch)
+      - name: Cherry-pick and Release (Pre Branch)
         if: steps.parse_version.outputs.parse_failed == 'false' && steps.parse_version.outputs.is_pre == 'true'
         run: |
           git config --global user.name "github-actions[bot]"
