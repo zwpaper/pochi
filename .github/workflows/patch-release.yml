@@ -1,0 +1,98 @@
+name: Patch Release
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  patch-release:
+    if: github.event.issue.pull_request && startsWith(github.event.comment.body, '/release')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+
+    steps:
+      - name: Parse Version
+        id: parse_version
+        run: |
+          COMMENT_BODY="${{ github.event.comment.body }}"
+          VERSION_RAW=$(echo "$COMMENT_BODY" | sed 's/\/release //')
+          # Remove leading 'v' if present
+          VERSION_NUMBER=$(echo "$VERSION_RAW" | sed 's/^v//')
+
+          # Validate version format (expecting something like 0.98)
+          if [[ ! "$VERSION_NUMBER" =~ ^[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version format: $VERSION_NUMBER. Expected format like 0.98"
+            exit 1
+          fi
+
+          MAJOR=$(echo "$VERSION_NUMBER" | cut -d. -f1)
+          MINOR=$(echo "$VERSION_NUMBER" | cut -d. -f2)
+
+          # Calculate target branch version (minor - 1)
+          # Use %g or simple arithmetic to avoid octal issues and keep format consistent
+          TARGET_MINOR_VAL=$((10#$MINOR - 1))
+          # The user specified release-vscode-0-97 for /release 0.98
+          TARGET_BRANCH="release-vscode-$MAJOR-$(printf "%02d" $TARGET_MINOR_VAL)"
+
+          echo "version=v$VERSION_NUMBER" >> $GITHUB_OUTPUT
+          echo "target_branch=$TARGET_BRANCH" >> $GITHUB_OUTPUT
+
+      - name: Add Labels to PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = ['cherry-pick', '${{ steps.parse_version.outputs.version }}'];
+            github.rest.issues.addLabels({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              labels: labels
+            });
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get PR Merged Commit
+        id: get_commit
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number
+            });
+            if (!pr.data.merged) {
+              core.setFailed('PR is not merged. Cannot cherry-pick.');
+              return;
+            }
+            core.setOutput('merge_commit_sha', pr.data.merge_commit_sha);
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Cherry-pick and Release
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Checkout target branch
+          git checkout ${{ steps.parse_version.outputs.target_branch }}
+
+          # Cherry-pick the merged commit
+          git cherry-pick ${{ steps.get_commit.outputs.merge_commit_sha }}
+
+          bun install --frozen-lockfile
+
+          # Run release in packages/vscode
+          cd packages/vscode
+          bun run release --release patch --quiet
+
+          # Push changes back to the release branch
+          git push origin ${{ steps.parse_version.outputs.target_branch }} --tags
