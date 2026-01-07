@@ -110,6 +110,9 @@ jobs:
           # Checkout pre-branch
           git checkout ${{ steps.parse_version.outputs.pre_branch }}
 
+          # Fetch the commit to ensure it exists locally
+          git fetch origin ${{ steps.get_commit.outputs.merge_commit_sha }}
+
           # Cherry-pick the merged commit
           git cherry-pick ${{ steps.get_commit.outputs.merge_commit_sha }}
 
@@ -132,6 +135,7 @@ jobs:
           issue-title: "Release patch release from ${{ steps.parse_version.outputs.version }} to ${{ steps.parse_version.outputs.main_branch }}"
           issue-body: |
             Please approve or deny the release of ${{ steps.parse_version.outputs.version }} to ${{ steps.parse_version.outputs.main_branch }}.
+            - Pull Request: ${{ github.event.issue.html_url }}
             - Approval keywords: approve, approved, lgtm, yes
             - Denied keywords: deny, denied, no
           exclude-workflow-initiator-as-approver: false
@@ -145,6 +149,9 @@ jobs:
 
           # Checkout main-branch
           git checkout ${{ steps.parse_version.outputs.main_branch }}
+
+          # Fetch the commit to ensure it exists locally
+          git fetch origin ${{ steps.get_commit.outputs.merge_commit_sha }}
 
           # Cherry-pick the merged commit
           git cherry-pick ${{ steps.get_commit.outputs.merge_commit_sha }}
