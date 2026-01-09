@@ -78,7 +78,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.RELEASE_TOKEN }}
+          token: ${{ secrets.POCHI_HOMEBREW_GITHUB_TOKEN }}
 
       - name: Get PR Merged Commit
         if: steps.parse_version.outputs.parse_failed == 'false'
