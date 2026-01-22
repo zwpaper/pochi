@@ -340,6 +340,72 @@ You can manage your custom agents through the Pochi interface or by directly man
 * **Edit**: Modify the agent's definition file.
 
 
+# Edits
+URL: /edits
+Send your local changes as additional context to Pochi
+***
+
+title: Edits
+description: Send your local changes as additional context to Pochi
+icon: "PencilLine"
+------------------
+
+# Edits
+
+Edits account for changes you make locally while iterating on the code. If you fix something yourself, tweak a variable, or partially rewrite a block before asking for help, Pochi captures those recent edits and includes them as part of the review context.
+
+Instead of only seeing the final file state, the agent receives the exact diffs you introduced, which helps it reason about what changed, where it changed, and what you were likely trying to adjust.
+
+This gives the agent a clearer signal of your current intent and what should be addressed next.
+
+<video
+  controls
+  style={{
+      width: "100%",
+      borderRadius: "8px",
+      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+      }}
+>
+  <source src="https://assets.docs.getpochi.com/useredits.mp4" type="video/mp4" />
+
+  Your browser does not support the video tag.
+</video>
+
+## How to Use Edits
+
+### 1. Make your changes
+
+You can open the diff from the last response and make direct changes to the written code.
+
+![Pochi Models](../assets/images/edits-creation-process.png)
+
+All local changes you make gets reflected in the chatbox UI.
+
+![Pochi Models](../assets/images/edits-tracking-prompt-ui.png)
+
+### 2. Send Edits as a Batch
+
+Once you’re done making changes, submit your next prompt as usual.
+
+For example:
+
+```bash
+Please review the edits
+```
+
+or with extra guidance:
+
+```bash
+Use these edits to understand the new functions we need to add
+```
+
+Pochi will include your recent edits together with your message and use them as structured context for the next step.
+
+![Pochi Models](../assets/images/edits-submitted-prompt.png)
+
+This lets the agent build directly on top of what you already adjusted, without you needing to re-explain those changes in chat.
+
+
 # GitHub
 URL: /github
 
@@ -1534,7 +1600,7 @@ When creating PR with markdown description, pay attention to escape backticks, o
 You can use a single line prefixed with `!` to execute a command. The output of the command will be embedded into the prompt sent to the model.
 
 ```markdown
-!\`git diff --cached\`
+!`git diff --cached`
 
 Please review the staged changes and suggest improvements.
 ```
@@ -2909,6 +2975,61 @@ Let’s dive in!
 * We’re working on a Create Plan flow for new tasks in the sidebar, letting you generate a structured plan first before executing the task.
 
 
+# Weekly Update
+URL: /developer-updates/2026-01-16-weekly-update-19
+
+***
+
+## title: Weekly Update #19
+
+# Weekly Update #19
+
+### TL;DR
+
+Another batch of updates is out. Here’s what we’ve shipped since the last release.
+
+### ✨ Enhancements
+
+* **New Pochi landing page:** The Pochi website now has a new landing page with clearer explanations of core features, workflows, and setup, making it easier for new users to evaluate and install Pochi. [#Visit Page](https://www.tabbyml.com/agent)
+
+  <video
+    controls
+    style={{
+      width: "100%",
+      borderRadius: "8px",
+      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+      }}
+  >
+    <source src="https://assets.docs.getpochi.com/landing-page-pochi.mp4" type="video/mp4" />
+
+    Your browser does not support the video tag.
+  </video>
+
+* **Embedded bash outputs are now visible in the UI:** When workflows embed command outputs into the model context (for example git diff in the create-pr workflow), those outputs are now displayed in chat instead of being hidden as system messages, making it easier to inspect and debug what the agent is responding to. [#1010](https://github.com/TabbyML/pochi/issues/1010)
+  <video
+    controls
+    style={{
+     width: "100%",
+     borderRadius: "8px",
+     boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+     }}
+  >
+    <source src="https://assets.docs.getpochi.com/bash-commands-embedds-024.mp4" type="video/mp4" />
+
+    Your browser does not support the video tag.
+  </video>
+
+### 📖 Resources
+
+* We published a step-by-step guide showing how to use Git worktrees and parallel agents to run multiple tasks concurrently, with a practical weather app example that walks through setup, coordination, and best practices. [#Read more](https://docs.getpochi.com/tutorials/parallel-agent-guidance/)
+
+### 🔥 Preview
+
+* Along with Create Plan flow for new tasks, we’re also working on letting you choose which MCP servers and tools a task can access directly from the sidebar, instead of using a single global auto-approve toggle.
+
+  Stay tuned!
+
+
 # NES Series (Part 2): Real-Time Context Management in Your Code Editor
 URL: /developer-updates/context-management-in-your-editor
 Learn how Pochi's NES model manages, ranks, and streams real-time edit context
@@ -3267,6 +3388,59 @@ Here you will find highlights on features, enhancements, and bug fixes, plus ins
   ### Sep 22, 2025
 
   --- */}
+
+## [Weekly Update #19](./2026-01-16-weekly-update-19)
+
+#### Jan 16, 2026
+
+# Weekly Update #19
+
+### TL;DR
+
+Another batch of updates is out. Here’s what we’ve shipped since the last release.
+
+### ✨ Enhancements
+
+* **New Pochi landing page:** The Pochi website now has a new landing page with clearer explanations of core features, workflows, and setup, making it easier for new users to evaluate and install Pochi. [#Visit Page](https://www.tabbyml.com/agent)
+
+  <video
+    controls
+    style={{
+      width: "100%",
+      borderRadius: "8px",
+      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+      }}
+  >
+    <source src="https://assets.docs.getpochi.com/landing-page-pochi.mp4" type="video/mp4" />
+
+    Your browser does not support the video tag.
+  </video>
+
+* **Embedded bash outputs are now visible in the UI:** When workflows embed command outputs into the model context (for example git diff in the create-pr workflow), those outputs are now displayed in chat instead of being hidden as system messages, making it easier to inspect and debug what the agent is responding to. [#1010](https://github.com/TabbyML/pochi/issues/1010)
+  <video
+    controls
+    style={{
+     width: "100%",
+     borderRadius: "8px",
+     boxShadow: "0 4px 12px rgba(0, 0, 0, 0.15)",
+     }}
+  >
+    <source src="https://assets.docs.getpochi.com/bash-commands-embedds-024.mp4" type="video/mp4" />
+
+    Your browser does not support the video tag.
+  </video>
+
+### 📖 Resources
+
+* We published a step-by-step guide showing how to use Git worktrees and parallel agents to run multiple tasks concurrently, with a practical weather app example that walks through setup, coordination, and best practices. [#Read more](https://docs.getpochi.com/tutorials/parallel-agent-guidance/)
+
+### 🔥 Preview
+
+* Along with Create Plan flow for new tasks, we’re also working on letting you choose which MCP servers and tools a task can access directly from the sidebar, instead of using a single global auto-approve toggle.
+
+  Stay tuned!
+
+***
 
 ## [Weekly Update #18](./2026-01-09-weekly-update-18)
 
