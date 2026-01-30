@@ -480,5 +480,8 @@
     "reviewPlan": "Review",
     "executePlan": "Execute Plan",
     "creatingPlan": "Analyzing your code and creating a plan..."
+  },
+  "browserView": {
+    "noFrameAvailable": "No frame available"
   }
 }

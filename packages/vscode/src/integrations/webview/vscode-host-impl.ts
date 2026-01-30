@@ -1,6 +1,7 @@
 import * as os from "node:os";
 import path from "node:path";
 import { executeCommandWithPty } from "@/integrations/terminal/execute-command-with-pty";
+import { BrowserSessionStore } from "@/lib/browser-session-store";
 // biome-ignore lint/style/useImportType: needed for dependency injection
 import { CustomAgentManager } from "@/lib/custom-agent";
 import {
@@ -65,6 +66,7 @@ import {
 } from "@getpochi/common/tool-utils";
 import { getVendor } from "@getpochi/common/vendor";
 import {
+  type BuiltinSubAgentInfo,
   type CaptureEvent,
   type CreateWorktreeOptions,
   type CustomAgentFile,
@@ -108,7 +110,7 @@ import {
 import type { Tool } from "ai";
 import { keys } from "remeda";
 import * as runExclusive from "run-exclusive";
-import { Lifecycle, inject, injectable, scoped } from "tsyringe";
+import { Lifecycle, container, inject, injectable, scoped } from "tsyringe";
 import * as vscode from "vscode";
 // biome-ignore lint/style/useImportType: needed for dependency injection
 import { CheckpointService } from "../checkpoint/checkpoint-service";
@@ -183,6 +185,7 @@ export class VSCodeHostImpl implements VSCodeHostApi, vscode.Disposable {
     private readonly taskHistoryStore: TaskHistoryStore,
     private readonly taskStateStore: TaskDataStore,
     private readonly lang: PochiLanguage,
+    private readonly browserSessionStore: BrowserSessionStore,
     private readonly forkTaskStatus: ForkTaskStatus,
   ) {}
 
@@ -260,6 +263,20 @@ export class VSCodeHostImpl implements VSCodeHostApi, vscode.Disposable {
 
   readTasks = async () => {
     return ThreadSignal.serialize(this.taskHistoryStore.tasks);
+  };
+
+  readBrowserSession = async (taskId: string) => {
+    return ThreadSignal.serialize(
+      computed(() => this.browserSessionStore.browserSessions.value[taskId]),
+    );
+  };
+
+  registerBrowserSession = async (taskId: string) => {
+    return this.browserSessionStore.registerBrowserSession(taskId);
+  };
+
+  unregisterBrowserSession = async (taskId: string) => {
+    return this.browserSessionStore.unregisterBrowserSession(taskId);
   };
 
   readEnvironment = async (options: {
@@ -414,6 +431,7 @@ export class VSCodeHostImpl implements VSCodeHostApi, vscode.Disposable {
         toolCallId: string;
         abortSignal: ThreadAbortSignalSerialization;
         contentType?: string[];
+        builtinSubAgentInfo?: BuiltinSubAgentInfo;
       },
     ) => {
       let tool: ToolFunctionType<Tool> | undefined;
@@ -444,6 +462,7 @@ export class VSCodeHostImpl implements VSCodeHostApi, vscode.Disposable {
       }
 
       const abortSignal = new ThreadAbortSignal(options.abortSignal);
+      const envs = resolveToolCallEnvs(toolName, options.builtinSubAgentInfo);
       const toolCallStart = Date.now();
       const resolvedArgs = resolveToolCallArgs(args, this.task.id);
       const result = await safeCall(
@@ -453,6 +472,7 @@ export class VSCodeHostImpl implements VSCodeHostApi, vscode.Disposable {
           toolCallId: options.toolCallId,
           cwd: this.cwd,
           contentType: options.contentType,
+          envs,
         }),
       );
 
@@ -1229,6 +1249,26 @@ function safeCall<T>(x: Promise<T>) {
     };
   });
 }
+
+const resolveToolCallEnvs = (
+  toolName: string,
+  builtInSubAgentInfo?: BuiltinSubAgentInfo,
+) => {
+  let envs: Record<string, string> | undefined;
+
+  if (builtInSubAgentInfo?.type !== "browser") {
+    return envs;
+  }
+
+  if (toolName !== "executeCommand") {
+    return envs;
+  }
+
+  const browserSessionStore = container.resolve(BrowserSessionStore);
+  envs = browserSessionStore.getAgentBrowserEnvs(builtInSubAgentInfo.sessionId);
+
+  return envs;
+};
 
 const ToolMap: Record<
   string,

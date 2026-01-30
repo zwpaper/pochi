@@ -481,5 +481,8 @@
     "reviewPlan": "评审",
     "executePlan": "执行计划",
     "creatingPlan": "正在分析您的代码并制定计划..."
+  },
+  "browserView": {
+    "noFrameAvailable": "无画面"
   }
 }

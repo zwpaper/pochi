@@ -5,6 +5,7 @@ import { useCustomAgent } from "@/lib/hooks/use-custom-agents";
 import { usePochiCredentials } from "@/lib/hooks/use-pochi-credentials";
 import { useTaskMcpConfigOverride } from "@/lib/hooks/use-task-mcp-config-override";
 import { blobStore } from "@/lib/remote-blob-store";
+import { useManageBrowserSession } from "@/lib/use-browser-session";
 import { useDefaultStore } from "@/lib/use-default-store";
 import { cn } from "@/lib/utils";
 import { vscodeHost } from "@/lib/vscode";
@@ -13,7 +14,6 @@ import { formatters } from "@getpochi/common";
 import type { UserInfo } from "@getpochi/common/configuration";
 import { type Task, catalog } from "@getpochi/livekit";
 import { useLiveChatKit } from "@getpochi/livekit/react";
-
 import type { Todo } from "@getpochi/tools";
 import { useStoreRegistry } from "@livestore/react";
 import { Schema } from "@livestore/utils/effect";
@@ -43,8 +43,6 @@ import { useSubtaskInfo } from "./hooks/use-subtask-info";
 import { useAutoApproveGuard, useChatAbortController } from "./lib/chat-state";
 import { onOverrideMessages } from "./lib/on-override-messages";
 import { useLiveChatKitGetters } from "./lib/use-live-chat-kit-getters";
-import { useSendTaskNotification } from "./lib/use-send-task-notification";
-
 import {
   ChatContainerClassName,
   ChatToolbarContainerClassName,
@@ -116,8 +114,6 @@ function Chat({ user, uid, info }: ChatProps) {
 
   useRestoreTaskModel(task, isModelsLoading, updateSelectedModelId);
 
-  const { clearNotification } = useSendTaskNotification();
-
   const { autoApproveActive, autoApproveSettings } = useAutoApprove({
     autoApproveGuard: autoApproveGuard.current === "auto",
     isSubTask,
@@ -125,7 +121,10 @@ function Chat({ user, uid, info }: ChatProps) {
 
   const shouldStopAutoApprove = useShouldStopAutoApprove();
 
-  const { onStreamFinish } = useChatNotifications({
+  const {
+    onStreamStart: onChartNotificationsStreamStart,
+    onStreamFinish: onChartNotificationsStreamFinish,
+  } = useChatNotifications({
     uid,
     task,
     isSubTask,
@@ -134,11 +133,19 @@ function Chat({ user, uid, info }: ChatProps) {
     autoApproveSettings,
   });
 
+  const {
+    onStreamStart: onManageBrowserSessionStreamStart,
+    onStreamFinish: onManageBrowserSessionStreamFinish,
+  } = useManageBrowserSession({
+    uid,
+    task,
+    isSubTask,
+  });
+
   const chatKit = useLiveChatKit({
     store,
     blobStore,
     taskId: uid,
-
     getters,
     isSubTask,
     customAgent,
@@ -163,12 +170,13 @@ function Chat({ user, uid, info }: ChatProps) {
       return lastAssistantMessageIsCompleteWithToolCalls(x);
     },
     onOverrideMessages,
-    onStreamStart() {
-      clearNotification();
-      vscodeHost.onTaskRunning(task?.parentId || uid);
+    onStreamStart(data) {
+      onChartNotificationsStreamStart.current(data);
+      onManageBrowserSessionStreamStart.current(data);
     },
     onStreamFinish(data) {
-      onStreamFinish.current(data);
+      onChartNotificationsStreamFinish.current(data);
+      onManageBrowserSessionStreamFinish.current(data);
     },
   });
 

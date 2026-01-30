@@ -4,6 +4,8 @@ import type { ThreadSignalSerialization } from "@quilted/threads/signals";
 import type { Environment } from "../base";
 import type { UserInfo } from "../configuration";
 import type {
+  BrowserSession,
+  BuiltinSubAgentInfo,
   CaptureEvent,
   CustomAgentFile,
   ExecuteCommandResult,
@@ -88,6 +90,7 @@ export interface VSCodeHostApi {
       toolCallId: string;
       abortSignal: ThreadAbortSignalSerialization;
       contentType?: string[];
+      builtinSubAgentInfo?: BuiltinSubAgentInfo;
     },
   ): Promise<unknown>;
 
@@ -352,6 +355,14 @@ export interface VSCodeHostApi {
   readUserEdits(uid: string): Promise<ThreadSignalSerialization<FileDiff[]>>;
 
   readTasks(): Promise<ThreadSignalSerialization<Record<string, unknown>>>;
+
+  readBrowserSession(
+    taskId: string,
+  ): Promise<ThreadSignalSerialization<BrowserSession | undefined>>;
+
+  registerBrowserSession(taskId: string): Promise<void>;
+
+  unregisterBrowserSession(taskId: string): Promise<void>;
 
   /**
    * Read mcpConfigOverride for a task.

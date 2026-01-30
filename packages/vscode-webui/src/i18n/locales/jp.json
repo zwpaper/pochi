@@ -483,5 +483,8 @@
     "reviewPlan": "確認",
     "executePlan": "計画を実行",
     "creatingPlan": "コードを分析し、計画を作成しています..."
+  },
+  "browserView": {
+    "noFrameAvailable": "フレームが利用できません"
   }
 }

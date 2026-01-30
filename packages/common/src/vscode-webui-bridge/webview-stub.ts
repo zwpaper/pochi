@@ -3,6 +3,8 @@ import type { ThreadSignalSerialization } from "@quilted/threads/signals";
 import type { Environment } from "../base";
 import type { UserInfo } from "../configuration";
 import type {
+  BrowserSession,
+  BuiltinSubAgentInfo,
   CaptureEvent,
   CustomAgentFile,
   DisplayModel,
@@ -78,6 +80,7 @@ const VSCodeHostStub = {
     _options: {
       toolCallId: string;
       abortSignal: ThreadAbortSignalSerialization;
+      builtinSubAgentInfo?: BuiltinSubAgentInfo;
     },
   ): Promise<unknown> => {
     return Promise.resolve(undefined);
@@ -327,6 +330,15 @@ const VSCodeHostStub = {
   setGlobalState: async (): Promise<void> => {},
   readTasks: (): Promise<ThreadSignalSerialization<Record<string, unknown>>> =>
     Promise.resolve({} as ThreadSignalSerialization<Record<string, unknown>>),
+  readBrowserSession: (
+    _taskId: string,
+  ): Promise<ThreadSignalSerialization<BrowserSession | undefined>> =>
+    Promise.resolve(
+      {} as ThreadSignalSerialization<BrowserSession | undefined>,
+    ),
+  registerBrowserSession: (_taskId: string): Promise<void> => Promise.resolve(),
+  unregisterBrowserSession: (_taskId: string): Promise<void> =>
+    Promise.resolve(),
   readMcpConfigOverride: async (
     _taskId: string,
   ): Promise<{

@@ -477,5 +477,8 @@
     "reviewPlan": "검토",
     "executePlan": "계획 실행",
     "creatingPlan": "코드를 분석하고 계획을 수립 중입니다..."
+  },
+  "browserView": {
+    "noFrameAvailable": "프레임 없음"
   }
 }
