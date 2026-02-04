@@ -8,11 +8,11 @@ import {
 } from "@/components/ui/hover-card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { FixedStateChatContextProvider, useSendRetry } from "@/features/chat";
+import { useNavigate } from "@/lib/hooks/use-navigate";
 import { useReviewPlanTutorialCounter } from "@/lib/hooks/use-review-plan-tutorial-counter";
 import { useDefaultStore } from "@/lib/use-default-store";
 import { vscodeHost } from "@/lib/vscode";
 import { catalog } from "@getpochi/livekit";
-import { useNavigate } from "@tanstack/react-router";
 import {
   ClipboardList,
   FilePenLine,
