@@ -280,6 +280,7 @@
     "imgAlt": "MCP tool response snapshot",
     "applyingDiffTo": "Applying diff to ",
     "applyingDiffsTo": "Applying diffs to ",
+    "addingReviewComment": "Reviewing ",
     "in": "in",
     "executeCommand": "I will execute the following command",
     "executingCommand": "Executing command",
@@ -414,7 +415,8 @@
     "copyCheckpointCommand": "Copy Checkpoint Command",
     "copyTodos": "Copy TODOs",
     "noCheckpointAvailable": "No checkpoint available",
-    "openStore": "Open Store"
+    "openStore": "Open Store",
+    "reviewChanges": "Review Changes"
   },
   "devRetryCountdown": {
     "attempts": "Attempts:",
