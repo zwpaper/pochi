@@ -130,9 +130,40 @@ export const TaskThread: React.FC<{
   );
 };
 
+/**
+ * Filter out askFollowupQuestion if it's the last tool call in the last message.
+ * This prevents showing the follow-up question UI in subtasks.
+ */
+function filterTrailingAskFollowupQuestion(messages: Message[]): Message[] {
+  if (messages.length === 0) return messages;
+
+  const lastMessage = messages[messages.length - 1];
+  if (lastMessage.role !== "assistant") return messages;
+
+  const parts = lastMessage.parts;
+  if (!Array.isArray(parts) || parts.length === 0) return messages;
+
+  // Check if the last part is an askFollowupQuestion
+  const lastPart = parts[parts.length - 1];
+  if (lastPart.type === "tool-askFollowupQuestion") {
+    // Remove the askFollowupQuestion tool call from the message
+    const filteredParts = parts.slice(0, -1);
+    if (filteredParts.length === 0) {
+      // If no parts left, remove the entire message
+      return messages.slice(0, -1);
+    }
+    return [...messages.slice(0, -1), { ...lastMessage, parts: filteredParts }];
+  }
+
+  return messages;
+}
+
 function prepareForRender(messages: Message[]): Message[] {
   // Remove user messages.
   const filteredMessages = messages.filter((x) => x.role !== "user");
-  const x = formatters.ui(filteredMessages);
+  // Filter out trailing askFollowupQuestion tool calls
+  const withoutTrailingAskFollowup =
+    filterTrailingAskFollowupQuestion(filteredMessages);
+  const x = formatters.ui(withoutTrailingAskFollowup);
   return x;
 }
