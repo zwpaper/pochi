@@ -209,7 +209,12 @@ export class NESSweepModelClient
       prompt: buildPrompt(baseSegments, extraSegments),
       max_tokens: MaxOutputTokens,
       temperature: Temperature,
-      stop: ["<|file_sep|>", "</s>"],
+      stop: [
+        "<|file_sep|>",
+        "</s>",
+        "<|fim_middle|>", // The model may unexpectedly generate this token
+        "\n".repeat(10), // prevent infinite newlines loop
+      ],
     };
 
     const result = await this.fetcher.fetchCompletion(
