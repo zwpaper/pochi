@@ -162,7 +162,6 @@ export class VSCodeHostImpl implements VSCodeHostApi, vscode.Disposable {
   private toolCallGroup = runExclusive.createGroupRef();
   private checkpointGroup = runExclusive.createGroupRef();
   private disposables: vscode.Disposable[] = [];
-  private currentTaskId: string | null = null;
 
   constructor(
     @inject("vscode.ExtensionContext")
@@ -197,17 +196,6 @@ export class VSCodeHostImpl implements VSCodeHostApi, vscode.Disposable {
 
   private get cwd() {
     return this.workspaceScope.cwd;
-  }
-
-  set taskId(taskId: string | null) {
-    this.currentTaskId = taskId;
-  }
-
-  private get task() {
-    if (!this.currentTaskId) {
-      return null;
-    }
-    return this.taskHistoryStore.tasks.value[this.currentTaskId];
   }
 
   listRuleFiles = async (): Promise<RuleFile[]> => {
@@ -285,9 +273,13 @@ export class VSCodeHostImpl implements VSCodeHostApi, vscode.Disposable {
     return this.browserSessionStore.unregisterBrowserSession(taskId);
   };
 
+  /**
+   * @param options.taskId - The passed in taskId parameter is always the top level parameter in the task, (e.g even for a tool call from a subtask, it's still invoked with its parent task's call)
+   */
   readEnvironment = async (options: {
     isSubTask?: boolean;
     webviewKind: "sidebar" | "pane";
+    taskId?: string;
   }): Promise<Environment> => {
     const isSubTask = options.isSubTask ?? false;
     const webviewKind = options.webviewKind;
@@ -313,6 +305,11 @@ export class VSCodeHostImpl implements VSCodeHostApi, vscode.Disposable {
       gitStatus = await gitStatusReader.readGitStatus();
     }
 
+    const shareId = options.taskId
+      ? (this.taskHistoryStore.tasks.value[options.taskId]?.shareId ??
+        undefined)
+      : undefined;
+
     const environment: Environment = {
       currentTime: new Date().toString(),
       workspace: {
@@ -331,7 +328,7 @@ export class VSCodeHostImpl implements VSCodeHostApi, vscode.Disposable {
         ...systemInfo,
         customRules,
       },
-      shareId: this.task?.shareId ?? undefined,
+      shareId,
     };
 
     return environment;
@@ -442,6 +439,10 @@ export class VSCodeHostImpl implements VSCodeHostApi, vscode.Disposable {
         abortSignal: ThreadAbortSignalSerialization;
         contentType?: string[];
         builtinSubAgentInfo?: BuiltinSubAgentInfo;
+        /**
+         * The passed in taskId parameter is always the top level parameter in the task, (e.g even for a tool call from a subtask, it's still invoked with its parent task's call)
+         */
+        taskId: string;
       },
     ) => {
       let tool: ToolFunctionType<Tool> | undefined;
@@ -465,16 +466,10 @@ export class VSCodeHostImpl implements VSCodeHostApi, vscode.Disposable {
         };
       }
 
-      if (!this.task) {
-        return {
-          error: "No task found.",
-        };
-      }
-
       const abortSignal = new ThreadAbortSignal(options.abortSignal);
       const envs = resolveToolCallEnvs(toolName, options.builtinSubAgentInfo);
       const toolCallStart = Date.now();
-      const resolvedArgs = resolveToolCallArgs(args, this.task.id);
+      const resolvedArgs = resolveToolCallArgs(args, options.taskId);
       const result = await safeCall(
         tool(resolvedArgs, {
           abortSignal,
@@ -520,6 +515,10 @@ export class VSCodeHostImpl implements VSCodeHostApi, vscode.Disposable {
         toolCallId: string;
         state: "partial-call" | "call" | "result";
         abortSignal?: ThreadAbortSignalSerialization;
+        /**
+         * The passed in taskId parameter is always the top level parameter in the task, (e.g even for a tool call from a subtask, it's still invoked with its parent task's call)
+         */
+        taskId: string;
       },
     ) => {
       const tool = ToolPreviewMap[toolName];
@@ -528,10 +527,6 @@ export class VSCodeHostImpl implements VSCodeHostApi, vscode.Disposable {
       }
 
       if (!this.cwd) {
-        return;
-      }
-
-      if (!this.task) {
         return;
       }
 
@@ -547,7 +542,7 @@ export class VSCodeHostImpl implements VSCodeHostApi, vscode.Disposable {
 
       const resolvedArgs = resolveToolCallArgs(
         args,
-        this.task.id,
+        options.taskId,
       ) as Partial<unknown> | null;
       return await safeCall<PreviewReturnType>(
         tool(resolvedArgs, {
@@ -568,15 +563,21 @@ export class VSCodeHostImpl implements VSCodeHostApi, vscode.Disposable {
       base64Data?: string;
       fallbackGlobPattern?: string;
       cellId?: string;
+      /**
+       * The passed in taskId parameter is always the top level parameter in the task, (e.g even for a tool call from a subtask, it's still invoked with its parent task's call)
+       */
+      taskId?: string;
     },
   ) => {
-    if (!this.task) return;
     let fileUri = vscode.Uri.parse(filePath);
     let resolvedPath = filePath;
 
     // Open file directly if it's a pochi scheme
     if (fileUri.scheme === "pochi") {
-      resolvedPath = resolvePochiUri(filePath, this.task.id);
+      if (!options?.taskId) {
+        return;
+      }
+      resolvedPath = resolvePochiUri(filePath, options.taskId);
       vscode.commands.executeCommand(
         "vscode.open",
         vscode.Uri.parse(resolvedPath),

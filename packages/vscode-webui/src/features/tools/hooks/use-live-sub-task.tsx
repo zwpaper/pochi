@@ -118,6 +118,11 @@ export function useLiveSubTask(
         return;
       }
 
+      // Must be sub-task
+      if (!task?.parentId) {
+        return;
+      }
+
       toolCallStatusRegistry.set(toolCall, {
         isExecuting: true,
       });
@@ -139,6 +144,7 @@ export function useLiveSubTask(
           ),
           contentType: customAgentModel?.contentType,
           builtinSubAgentInfo,
+          taskId: task?.parentId,
         },
       );
 

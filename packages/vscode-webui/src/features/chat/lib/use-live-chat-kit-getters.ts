@@ -28,12 +28,14 @@ export function useLiveChatKitGetters({
   isSubTask,
   modelOverride,
   mcpConfigOverride,
+  taskId,
 }: {
   todos: React.RefObject<Todo[] | undefined>;
   isSubTask: boolean;
   modelOverride?: DisplayModel;
   /** Per-task MCP tool configuration. If provided, filters the global toolset. */
   mcpConfigOverride?: McpConfigOverride | null;
+  taskId?: string | null;
 }) {
   const { toolset, instructions, connections } = useMcp();
   const mcpInfo = useLatest({
@@ -54,13 +56,14 @@ export function useLiveChatKitGetters({
     const environment = await vscodeHost.readEnvironment({
       isSubTask,
       webviewKind: globalThis.POCHI_WEBVIEW_KIND,
+      taskId: taskId || undefined,
     });
 
     return {
       todos: todos.current,
       ...environment,
     } satisfies Environment;
-  }, [todos, isSubTask]);
+  }, [todos, isSubTask, taskId]);
 
   return {
     // biome-ignore lint/correctness/useExhaustiveDependencies(llm.current): llm is ref.
