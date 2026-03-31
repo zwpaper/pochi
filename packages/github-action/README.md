@@ -21,7 +21,7 @@ on:
 
 jobs:
   pochi:
-    if: startsWith(github.event.comment.body, '/pochi')
+    if: startsWith(github.event.comment.body, '@pochi')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -39,10 +39,10 @@ Set up your `POCHI_API_KEY` secret and you're ready to go!
 ### How to Use
 
 1. **Create a Pull Request** in your repository
-2. **Comment on the PR** with `/pochi` followed by your request:
-   - `/pochi review this code`
-   - `/pochi explain the changes in this PR`
-   - `/pochi suggest improvements`
+2. **Comment on the PR** with `@pochi` followed by your request:
+   - `@pochi review this code`
+   - `@pochi explain the changes in this PR`
+   - `@pochi suggest improvements`
 
 The action will respond with AI-generated analysis and suggestions!
 
@@ -85,7 +85,7 @@ jobs:
   pochi-review:
     if: |
       github.event.issue.pull_request && 
-      contains(github.event.comment.body, '/pochi')
+      contains(github.event.comment.body, '@pochi')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PR
@@ -121,13 +121,13 @@ If you need to use a custom GitHub token (for cross-repo operations):
 
 ## Supported Commands
 
-- `/pochi` - Basic command trigger (summarizes the PR)
+- `@pochi` - Basic command trigger (summarizes the PR)
 
 ## Troubleshooting
 
 ### Action doesn't respond
 
-1. Check that the PR comment starts with `/pochi`
+1. Check that the PR comment starts with `@pochi`
 2. Verify `POCHI_API_KEY` is set in repository secrets
 3. Ensure workflow has correct permissions
 4. Check workflow runs in Actions tab
