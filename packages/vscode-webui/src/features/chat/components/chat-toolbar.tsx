@@ -153,6 +153,7 @@ export const ChatToolbar: React.FC<ChatToolbarProps> = ({
     useCustomAgents(true);
 
   const [queuedMessages, setQueuedMessages] = useState<DraftMessage[]>([]);
+
   const [excludedUserEditsContext, setExcludedUserEditsContext] =
     useState<string>();
   const lastCheckpointHash = task?.lastCheckpointHash ?? undefined;
@@ -357,6 +358,7 @@ export const ChatToolbar: React.FC<ChatToolbarProps> = ({
     flushBackgroundJobNotifications?.();
   }, [
     isIdle,
+    messages,
     queuedMessages,
     pendingBackgroundJobNotifications,
     flushBackgroundJobNotifications,
@@ -372,7 +374,11 @@ export const ChatToolbar: React.FC<ChatToolbarProps> = ({
       parts: [...pendingBackgroundJobNotifications],
       raw: {
         text: pendingBackgroundJobNotifications
-          .map((part) => part.data.summary)
+          .map((part) =>
+            part.data.kind === "subagent"
+              ? `Subagent ${part.data.status}: ${part.data.title || part.data.agentType || part.data.taskId}`
+              : part.data.summary,
+          )
           .join("\n"),
         nonRemovable: true,
       },
@@ -608,7 +614,7 @@ export const ChatToolbar: React.FC<ChatToolbarProps> = ({
             todos={todos}
             getSystemPrompt={getSystemPrompt}
           />
-          <BackgroundJobManagePanel taskId={taskId} messages={messages} />
+          <BackgroundJobManagePanel taskId={taskId} />
           <AutoApproveMenu
             isSubTask={isSubTask}
             mcpConfigOverride={mcpConfigOverride}

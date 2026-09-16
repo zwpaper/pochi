@@ -52,7 +52,15 @@ import type { DisplayModel } from "./types/model";
 import type { PochiCredentials } from "./types/pochi";
 import type { VSCodeSettings } from "./types/vscode-settings";
 
-export type BackgroundCommands = Record<string, { isVisible: boolean }>;
+export type BackgroundCommands = Record<
+  string,
+  {
+    isVisible: boolean;
+    taskId?: string;
+    command?: string;
+    outputFile?: string;
+  }
+>;
 
 export interface VSCodeHostApi {
   readResourceURI(): Promise<ResourceURI>;
@@ -108,6 +116,7 @@ export interface VSCodeHostApi {
       storeId: string;
       taskId: string;
       fileStateCacheSourceTaskId?: string;
+      allowBackground?: boolean;
     },
   ): Promise<unknown>;
 

@@ -16,6 +16,13 @@ export {
   parseEnvironmentInfoResult,
 } from "./prompts";
 
+export {
+  createBackgroundSubAgentStartedResult,
+  getSubAgentBackgroundJobId,
+  getSubAgentTaskId,
+  getSubAgentNotificationId,
+} from "./subagent";
+
 export { SocialLinks } from "./social";
 export * as constants from "./constants";
 
@@ -108,8 +115,16 @@ export interface BackgroundTaskState {
   tools?: readonly ToolSpecInput[];
   parentTaskId?: string;
   useCase?: ForkAgentUseCase;
+  agentType?: string;
   /** Maximum number of steps this background task may run. */
   maxSteps?: number;
   /** Step-start count inherited from the parent, excluded from the max-step guard. */
   baselineStepCount?: number;
 }
+
+export {
+  createBackgroundJobId,
+  parseBackgroundJobId,
+  type BackgroundJobId,
+  type BackgroundJobIdType,
+} from "./background-job-id";
