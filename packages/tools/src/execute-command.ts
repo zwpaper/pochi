@@ -221,9 +221,19 @@ Important:
 export function createBackgroundCommandResult(
   backgroundJobId: string,
   outputFile: string,
+  options?: { origin: "foreground-timeout" },
 ) {
+  const guidance =
+    options?.origin === "foreground-timeout"
+      ? "The foreground command timed out, but its original process is still running in the background. Do not retry the command in the foreground. Wait for the completion notification instead. Continue any independent work. If no independent work remains, call attemptCompletion to yield the current turn until the notification provides the authoritative status."
+      : "This confirms only that the job started, not that it completed successfully. Continue any independent work, and do not poll the file for completion. The completion notification is the authoritative status. If no independent work remains, call attemptCompletion to yield the current turn without claiming the job's outcome.";
+
   return {
-    output: `Background command "${backgroundJobId}" started. Its output is written to "${outputFile}". Do not infer job status from empty or partial output, and do not sleep or poll. Continue independent work, or use attemptCompletion if nothing else remains. After the completion notification resumes the task with its final status, read the output file if needed.`,
+    output: `Background job started.
+Job ID: "${backgroundJobId}"
+Output file: "${outputFile}"
+
+The output file contains command output only; it does not contain the job's status. ${guidance}`,
     isTruncated: false,
     _meta: { backgroundJobId, outputFile },
   };
