@@ -255,6 +255,8 @@ export type LiveChatKitBackgroundJobNotificationOptions = {
 export type LiveChatKitOptions<T> = {
   backgroundJobManager?: BackgroundJobManager;
   taskId: string;
+  /** Known working directory for creating a task before request preparation. */
+  cwd?: string;
 
   abortSignal?: AbortSignal;
 
@@ -392,6 +394,7 @@ export class LiveChatKit<
 
   constructor({
     taskId,
+    cwd,
     abortSignal,
     store,
     blobStore,
@@ -488,6 +491,11 @@ export class LiveChatKit<
       // Mark status to make async behaivor blocked based on status (e.g isLoading )
       const { messages } = this.chat;
       const lastMessage = messages.at(-1);
+      // Persist an actual submission before environment or memory loading can
+      // fail. Hosts without a known cwd still initialize in onStart.
+      if (lastMessage && cwd !== undefined) {
+        this.ensureInited(cwd);
+      }
       const isManualCompact =
         lastMessage?.role === "user" &&
         lastMessage.metadata?.kind === "user" &&
@@ -689,6 +697,24 @@ export class LiveChatKit<
 
     // Sync the chat messages.
     this.chat.messages = this.messages;
+  }
+
+  /**
+   * Creates the task row if it does not exist yet.
+   *
+   * Tasks opened without any seed content are created lazily, so that an empty
+   * panel the user never sends a message in is not persisted (and synced).
+   */
+  ensureInited(cwd: string | undefined) {
+    if (this.inited) return;
+
+    this.store.commit(
+      events.taskInited({
+        id: this.taskId,
+        cwd,
+        createdAt: new Date(),
+      }),
+    );
   }
 
   get task() {
@@ -953,15 +979,7 @@ export class LiveChatKit<
     const { store } = this;
     const lastMessage = messages.at(-1);
     if (lastMessage) {
-      if (!this.inited) {
-        store.commit(
-          events.taskInited({
-            id: this.taskId,
-            cwd: environment?.info.cwd,
-            createdAt: new Date(),
-          }),
-        );
-      }
+      this.ensureInited(environment?.info.cwd);
 
       const { task } = this;
       if (!task) {
