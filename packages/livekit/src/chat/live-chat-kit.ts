@@ -25,11 +25,13 @@ import {
   type ChatOnErrorCallback,
   type ChatOnFinishCallback,
   type ChatRequestOptions,
+  type ChatStatus,
   getToolName,
   isToolUIPart,
 } from "ai";
 import type z from "zod";
 import { BackgroundJobManager } from "../background-job/manager";
+import { MonitorMaxDeliveryCharacters } from "../background-job/monitor-delivery";
 import type { AutoMemoryManager } from "../background-task/memory/auto-memory";
 import type { AutoMemoryAdaptor } from "../background-task/memory/auto-memory";
 import type { TaskMemoryAdaptor } from "../background-task/memory/task-memory";
@@ -54,6 +56,7 @@ import {
   attachBackgroundJobNotificationParts,
   createBackgroundJobNotificationMessage,
   dedupeBackgroundJobNotificationParts,
+  getBackgroundJobNotificationParts,
   toBackgroundJobNotificationParts,
 } from "./background-job-notification";
 import { filterCompletionTools } from "./filter-completion-tools";
@@ -242,9 +245,9 @@ export type LiveChatKitBackgroundJobNotificationOptions = {
   /**
    * Starts a turn carrying nothing but the given notifications. Defaults to
    * sending the message on the kit's own chat; hosts that drive their own step
-   * loop (the CLI) append it instead and let the loop send it.
+   * loop (the CLI) must append it synchronously and let the loop send it.
    */
-  startTurn?: (message: Message) => MaybePromise<void>;
+  startTurn?: (message: Message) => void;
   /**
    * Called whenever the set of notifications waiting to be delivered changes,
    * so a host can render them.
@@ -339,6 +342,7 @@ type InitOptions = {
 export class LiveChatKit<
   T extends {
     messages: Message[];
+    readonly status: ChatStatus;
     stop: () => Promise<void>;
     sendMessage: (
       message: { parts: Message["parts"] },
@@ -744,9 +748,9 @@ export class LiveChatKit<
   }
 
   /**
-   * Hands finished background jobs to the kit. They are delivered with the
-   * next request that goes out anyway, or by `flushBackgroundJobNotifications`
-   * when the agent has nothing left to do.
+   * Hands background job results and monitor batches to the kit. They are
+   * delivered with the next request that goes out anyway, or by
+   * `flushBackgroundJobNotifications` when the agent has nothing left to do.
    *
    * Notifications already pending or already part of the conversation are
    * ignored, so a host may keep pushing the same ones until it observes them
@@ -767,11 +771,19 @@ export class LiveChatKit<
       !this.backgroundJobManager.isNotificationSilenced(
         part.data.backgroundJobId,
       );
-    const pending =
-      this.pendingBackgroundJobNotificationParts.filter(canNotify);
+    const delivered = [
+      ...this.chat.messages.flatMap((message) => message.parts),
+      ...this.messages.flatMap((message) => message.parts),
+    ];
+    // Another chat instance may have consumed a source head while this view
+    // was idle. Prune that local copy before accepting the promoted head.
+    const pending = dedupeBackgroundJobNotificationParts(
+      this.pendingBackgroundJobNotificationParts.filter(canNotify),
+      delivered,
+    );
     const added = dedupeBackgroundJobNotificationParts(
       parts.filter(canNotify),
-      [...this.chat.messages.flatMap((message) => message.parts), ...pending],
+      [...delivered, ...pending],
     );
     if (
       added.length === 0 &&
@@ -793,12 +805,38 @@ export class LiveChatKit<
     }
   }
 
-  private takePendingBackgroundJobNotifications() {
-    const parts = this.pendingBackgroundJobNotificationParts;
-    if (parts.length > 0) {
-      this.setPendingBackgroundJobNotifications([]);
+  private takePendingBackgroundJobNotifications(
+    existingParts: readonly Message["parts"][number][] = [],
+  ) {
+    const pending = dedupeBackgroundJobNotificationParts(
+      this.pendingBackgroundJobNotificationParts,
+      this.chat.messages.flatMap((message) => message.parts),
+    );
+    const notifications = pending.map((part) => part.data);
+    // A notification-only turn already selected a batch before sendMessage.
+    // Its request hook can add more events only within the same request budget.
+    const existingCharacters = getBackgroundJobNotificationParts(existingParts)
+      .flatMap((part) => (part.data.kind === "monitor" ? [part.data] : []))
+      .flatMap((batch) => batch.lines)
+      .reduce((total, line) => total + line.length, 0);
+    const ready = this.backgroundJobManager.takeReadyNotifications(
+      this.taskId,
+      notifications,
+      MonitorMaxDeliveryCharacters - existingCharacters,
+    );
+    const ids = new Set(ready.map((notice) => notice.notificationId));
+    const remaining = notifications.filter(
+      (notice) => !ids.has(notice.notificationId),
+    );
+    if (
+      ready.length ||
+      pending.length !== this.pendingBackgroundJobNotificationParts.length
+    ) {
+      this.setPendingBackgroundJobNotifications(
+        toBackgroundJobNotificationParts(remaining),
+      );
     }
-    return parts;
+    return toBackgroundJobNotificationParts(ready);
   }
 
   /**
@@ -812,9 +850,12 @@ export class LiveChatKit<
     );
     if (this.pendingBackgroundJobNotificationParts.length === 0) return;
 
+    const lastMessage = this.chat.messages.at(-1);
     const messages = attachBackgroundJobNotificationParts(
       this.chat.messages,
-      this.takePendingBackgroundJobNotifications(),
+      this.takePendingBackgroundJobNotifications(
+        lastMessage?.role === "user" ? lastMessage.parts : [],
+      ),
     );
     if (messages) {
       this.chat.messages = messages;
@@ -837,14 +878,25 @@ export class LiveChatKit<
     // would answer in the user's place and hide the question.
     if (isAwaitingFollowupAnswer(this.chat.messages.at(-1))) return false;
 
-    const message = createBackgroundJobNotificationMessage(
-      this.takePendingBackgroundJobNotifications(),
-    );
+    // Read the live SDK state: the host may still hold an idle render from
+    // before another sender synchronously started a request.
+    if (this.chat.status === "submitted" || this.chat.status === "streaming")
+      return false;
+    const parts = this.takePendingBackgroundJobNotifications();
+    if (parts.length === 0) return false;
+    const message = createBackgroundJobNotificationMessage(parts);
     const startTurn = this.backgroundJobNotifications?.startTurn;
-    if (startTurn) {
-      void startTurn(message);
-    } else {
-      void this.chat.sendMessage({ parts: message.parts });
+    const failed = (error: unknown) => {
+      // Only persistence in the conversation acknowledges the source queue.
+      this.enqueueBackgroundJobNotificationParts(parts);
+      logger.warn("Failed to send background job notifications", error);
+    };
+    try {
+      if (startTurn) startTurn(message);
+      else void this.chat.sendMessage({ parts: message.parts }).catch(failed);
+    } catch (error) {
+      failed(error);
+      return false;
     }
     return true;
   };
@@ -1198,7 +1250,9 @@ export class LiveChatKit<
   subscribeBackgroundJobs(): () => void {
     return this.backgroundJobManager.subscribeNotifications(
       this.taskId,
-      (notifications) => this.enqueueBackgroundJobNotifications(notifications),
+      (notifications) => {
+        this.enqueueBackgroundJobNotifications(notifications);
+      },
     );
   }
 

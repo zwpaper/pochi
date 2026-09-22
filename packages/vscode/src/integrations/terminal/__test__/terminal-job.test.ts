@@ -1,5 +1,9 @@
 import * as assert from "node:assert";
-import type { BackgroundJobTerminalEvent } from "@getpochi/common";
+import type {
+  BackgroundJobTerminalEvent,
+  BackgroundMonitorNotification,
+  MonitorJobOptions,
+} from "@getpochi/common";
 import { describe, it } from "mocha";
 import proxyquire from "proxyquire";
 
@@ -25,6 +29,8 @@ class TestPtyProcess {
   >();
   readonly replay: string[] = [];
   killCalls = 0;
+  groupKillCalls = 0;
+  groupTermination: Promise<void> = Promise.resolve();
   pauseCalls = 0;
   resumeCalls = 0;
 
@@ -56,6 +62,11 @@ class TestPtyProcess {
     this.killCalls++;
   }
 
+  killProcessGroup(): Promise<void> {
+    this.groupKillCalls++;
+    return this.groupTermination;
+  }
+
   pauseOutput(): void {
     this.pauseCalls++;
   }
@@ -85,6 +96,7 @@ async function flushPromises(): Promise<void> {
 
 function createHarness(options?: {
   replay?: string[];
+  monitor?: MonitorJobOptions;
   appendError?: Error;
   closeError?: Error;
   createTerminalError?: Error;
@@ -156,7 +168,8 @@ function createHarness(options?: {
             return "";
           }
         },
-        createBackgroundJobId: () => "bgjob-cmd-test",
+        createBackgroundJobId: (kind: string) =>
+          `bgjob-${kind === "monitor" ? "monitor" : "cmd"}-test`,
         getBackgroundJobOutputPath: () => "/tmp/bgjob-cmd-test.log",
       },
       "./output": {
@@ -185,6 +198,8 @@ function createHarness(options?: {
       "./utils": { ExecutionError: TestExecutionError },
     }) as typeof import("../terminal-job");
 
+  const monitorEvents: BackgroundMonitorNotification[] = [];
+  TerminalJob.onDidMonitorEvent(({ event }) => monitorEvents.push(event));
   const finishEvents: BackgroundJobTerminalEvent[] = [];
   TerminalJob.onDidFinish((event) => {
     lifecycle.push("event-fired");
@@ -198,6 +213,7 @@ function createHarness(options?: {
       command: "sleep 10",
       cwd: "/tmp",
       taskId: "task-test",
+      monitor: options?.monitor,
     });
   } catch (error) {
     adoptionError = error;
@@ -208,6 +224,7 @@ function createHarness(options?: {
     adoptionError,
     finalizeCalls,
     finishEvents,
+    monitorEvents,
     job: job as ReturnType<typeof TerminalJob.adopt>,
     lifecycle,
     ptyProcess,
@@ -229,6 +246,78 @@ interface FakeTerminal {
 }
 
 describe("TerminalJob", () => {
+  it("waits for monitor group cleanup before publishing the end or releasing its transcript", async () => {
+    const harness = createHarness({ monitor: { description: "watch" } });
+    let finishCleanup!: () => void;
+    harness.ptyProcess.groupTermination = new Promise<void>((resolve) => {
+      finishCleanup = resolve;
+    });
+    harness.job.kill();
+    harness.job.kill();
+    harness.ptyProcess.emitData("last output\n");
+    harness.ptyProcess.emitExit(143);
+    await flushPromises();
+    assert.strictEqual(harness.ptyProcess.groupKillCalls, 1);
+    assert.strictEqual(harness.ptyProcess.killCalls, 0);
+    assert.ok(!harness.monitorEvents.some((event) => event.ended));
+    assert.ok(!harness.lifecycle.includes("file-closed"));
+    assert.strictEqual(harness.TerminalJob.get(harness.job.id), harness.job);
+
+    finishCleanup();
+    await flushPromises();
+    assert.strictEqual(harness.monitorEvents.at(-1)?.ended?.status, "stopped");
+    assert.strictEqual(harness.monitorEvents.at(-1)?.ended?.reason, "kill requested");
+    assert.strictEqual(
+      harness.monitorEvents.filter((event) => event.ended).length,
+      1,
+    );
+    assert.ok(
+      harness.monitorEvents
+        .flatMap((event) => event.lines)
+        .includes("last output"),
+    );
+    assert.strictEqual(harness.TerminalJob.get(harness.job.id), undefined);
+  });
+
+  it("reports monitor cleanup failure even when the shell never exits", async () => {
+    const harness = createHarness({ monitor: { description: "watch" } });
+    harness.ptyProcess.groupTermination = Promise.reject(
+      new Error("Cannot terminate group: EPERM"),
+    );
+    harness.job.kill();
+    await flushPromises();
+    assert.strictEqual(harness.monitorEvents.at(-1)?.ended?.status, "failed");
+    assert.match(harness.monitorEvents.at(-1)?.ended?.reason ?? "", /EPERM/);
+    assert.strictEqual(harness.TerminalJob.get(harness.job.id), undefined);
+  });
+
+  it("monitors replayed and live output without echo, finalizes once, and releases the job", async () => {
+    const harness = createHarness({
+      replay: ["first\n"],
+      monitor: { description: "watch" },
+    });
+    assert.ifError(harness.adoptionError);
+    assert.strictEqual(harness.job.id, "bgjob-monitor-test");
+    harness.ptyProcess.emitData("last\n");
+    harness.ptyProcess.emitExit(0);
+    await flushPromises();
+    assert.deepStrictEqual(
+      harness.monitorEvents.flatMap((event) => event.lines),
+      ["first", "last"],
+    );
+    assert.strictEqual(
+      harness.monitorEvents.filter((event) => event.ended).length,
+      1,
+    );
+    assert.strictEqual(
+      harness.monitorEvents.at(-1)?.ended?.status,
+      "completed",
+    );
+    assert.deepStrictEqual(harness.finishEvents, []);
+    assert.strictEqual(harness.TerminalJob.get(harness.job.id), undefined);
+    assert.ok(harness.lifecycle.includes("file-closed"));
+  });
+
   it("does not launch shell integration for an already-aborted job", async () => {
     const closeEmitter = new TestEventEmitter<FakeTerminal>();
     const executeCommandCalls: string[] = [];

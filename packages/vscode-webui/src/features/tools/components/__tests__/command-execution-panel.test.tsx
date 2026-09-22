@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { Activity } from "lucide-react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BackgroundJobPanel } from "../command-execution-panel";
 
@@ -193,6 +194,57 @@ describe("BackgroundJobPanel job control", () => {
     expect(
       screen.queryByLabelText("commandExecutionPanel.terminalClosedOpenOutput"),
     ).toBeNull();
+  });
+
+  it("collapses monitor events and keeps scrollable details on hover", async () => {
+    jobInfo = undefined;
+    const output = "first log\nsecond log\nkill requested";
+    const { container } = render(
+      <BackgroundJobPanel
+        backgroundJobId="bgjob-monitor-1"
+        appearance="notification"
+        command="watch logs"
+        notificationTitle="Simulated log entries"
+        notificationIcon={<Activity className="size-3" />}
+        notificationEvents={[{ id: "event-1", text: output }]}
+        status="stopped"
+        outputFile="/tmp/monitor.log"
+      />,
+    );
+    const row = screen.getByRole("button", {
+      name: "commandExecutionPanel.expand",
+    });
+    expect(row.textContent).toBe("Simulated log entries");
+    expect(screen.getAllByRole("button")).toHaveLength(1);
+    expect(row.getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByText(/first log/)).toBeNull();
+    expect(row.querySelector(".lucide-activity")).not.toBeNull();
+    expect(row.querySelector(".lucide-circle-slash")).not.toBeNull();
+    expect(row.querySelector(".lucide-chevron-left")).not.toBeNull();
+    expect(row.querySelector("code")?.classList.contains("truncate")).toBe(
+      true,
+    );
+    fireEvent.click(row);
+    expect(row.getAttribute("aria-expanded")).toBe("true");
+    const event = screen.getByText(/first log/);
+    expect(event.textContent).toBe(output);
+    expect(event.classList.contains("truncate")).toBe(true);
+    fireEvent.pointerMove(event, { pointerType: "mouse" });
+    await waitFor(() => {
+      const tooltip = screen.getByRole("tooltip");
+      expect(tooltip.textContent).toContain(output);
+      expect(tooltip.querySelector(".overflow-y-auto")).not.toBeNull();
+    });
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "commandExecutionPanel.collapse",
+      }),
+    );
+    expect(row.getAttribute("aria-expanded")).toBe("false");
+    expect(
+      container.querySelector("[data-slot='collapsible-content'] code"),
+    ).toBeNull();
+    expect(openFile).not.toHaveBeenCalled();
   });
 
   it("opens the output file from the notification row and shows its summary tooltip", async () => {

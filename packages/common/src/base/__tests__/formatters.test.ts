@@ -75,6 +75,10 @@ describe('formatters', () => {
   describe('formatters.ui', () => {
     it.each([
       ['content', [{ type: 'text', text: 'Visible prompt' }]],
+      ['content', [{ type: 'data-background-job-notification', data: {
+        kind: 'monitor', notificationId: 'monitor:1', backgroundJobId: 'bgjob-monitor-1',
+        description: 'CI', command: 'watch', outputFile: '/tmp/watch.log', lines: ['passed'],
+      } }]],
       [
         'content',
         [

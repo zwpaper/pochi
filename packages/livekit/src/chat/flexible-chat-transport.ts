@@ -7,7 +7,11 @@ import type {
   PochiProviderOptions,
   PochiRequestUseCase,
 } from "@getpochi/common";
-import { formatters, prompts } from "@getpochi/common";
+import {
+  BackgroundJobNotification,
+  formatters,
+  prompts,
+} from "@getpochi/common";
 import { hasActiveTodos } from "@getpochi/common/message-utils";
 import * as R from "remeda";
 
@@ -569,7 +573,9 @@ export function convertDataPartToText(
   if (part.type === "data-background-job-notification") {
     return {
       type: "text" as const,
-      text: prompts.renderBackgroundJobNotification(part.data),
+      text: prompts.renderBackgroundJobNotification(
+        BackgroundJobNotification.parse(part.data),
+      ),
     };
   }
   return part;

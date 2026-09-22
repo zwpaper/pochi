@@ -791,6 +791,7 @@ class BackgroundTaskStateStore {
 }
 
 class FakeChat {
+  readonly status = "ready" as const;
   messages: Message[];
   private readonly onFinish: ChatOnFinishCallback<Message>;
   private readonly onError: ChatOnErrorCallback;

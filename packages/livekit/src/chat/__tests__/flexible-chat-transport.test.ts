@@ -373,3 +373,31 @@ describe("getNumCompacts", () => {
         expect(getNumCompacts(messages)).toBe(2);
     });
 });
+
+describe("monitor notification transport", () => {
+  const monitor = {
+    kind: "monitor" as const,
+    notificationId: "monitor:first",
+    backgroundJobId: "bgjob-monitor-1",
+    description: "CI",
+    command: "watch",
+    outputFile: "/tmp/watch.log",
+    lines: ["<test> passed"],
+  };
+
+  it("renders canonical monitor notifications through the shared prompt renderer", () => {
+    expect(convertDataPartToText({
+      type: "data-background-job-notification", data: monitor,
+    })).toEqual({ type: "text", text: prompts.renderBackgroundJobNotification(monitor) });
+  });
+
+  it("renders a final monitor batch through the shared prompt renderer", () => {
+    const ended = { ...monitor, notificationId: "monitor:end", lines: ["last line"], ended: { reason: "done", status: "completed" as const } };
+    expect(convertDataPartToText({
+      type: "data-background-job-notification", data: ended,
+    })).toEqual({
+      type: "text",
+      text: prompts.renderBackgroundJobNotification(ended),
+    });
+  });
+});

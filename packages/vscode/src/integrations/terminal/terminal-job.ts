@@ -1,5 +1,10 @@
 import { getLogger } from "@/lib/logger";
-import type { BackgroundJobTerminalEvent } from "@getpochi/common";
+import {
+  type BackgroundJobTerminalEvent,
+  type BackgroundMonitorNotification,
+  type MonitorJobOptions,
+  MonitorWatcher,
+} from "@getpochi/common";
 import { getTerminalEnv } from "@getpochi/common/env-utils";
 import {
   BackgroundJobOutputFile,
@@ -29,6 +34,7 @@ export interface TerminalJobConfig {
   abortSignal?: AbortSignal;
   taskId: string;
   envs?: Record<string, string>;
+  monitor?: MonitorJobOptions;
 }
 
 export class TerminalJob implements vscode.Disposable {
@@ -46,6 +52,20 @@ export class TerminalJob implements vscode.Disposable {
     new vscode.EventEmitter<TerminalJob>();
   static readonly onDidChangeVisibility =
     TerminalJob.onDidChangeVisibilityEmitter.event;
+
+  private static readonly onDidMonitorEventEmitter = new vscode.EventEmitter<{
+    taskId: string;
+    event: BackgroundMonitorNotification;
+  }>();
+  static readonly onDidMonitorEvent =
+    TerminalJob.onDidMonitorEventEmitter.event;
+  private monitorWatcher: MonitorWatcher | undefined;
+  private monitorEndReason: string | undefined;
+  private monitorTermination: Promise<void> | undefined;
+
+  get monitorDescription() {
+    return this.config.monitor?.description;
+  }
 
   private terminal: vscode.Terminal | undefined;
   private ptyTerminal: PtyTerminal | undefined;
@@ -104,10 +124,21 @@ export class TerminalJob implements vscode.Disposable {
     private readonly config: TerminalJobConfig,
     private readonly ptyProcess?: PtyProcess,
   ) {
-    this.id = createBackgroundJobId("command");
+    this.id = createBackgroundJobId(config.monitor ? "monitor" : "command");
     this.outputFile = getBackgroundJobOutputPath(config.taskId, this.id);
 
     try {
+      if (config.monitor) {
+        this.monitorWatcher = new MonitorWatcher({
+          onEvents: (lines, omittedLines) =>
+            this.emitMonitorEvent(lines, undefined, omittedLines),
+          onTimeout: () => {
+            this.monitorEndReason = "killed after timeout";
+            this.kill();
+          },
+          timeoutMs: config.monitor.timeoutMs,
+        });
+      }
       this.outputWriter = new BackgroundJobOutputFile(this.outputFile);
       this.outputManager = OutputManager.create({
         id: this.id,
@@ -116,7 +147,7 @@ export class TerminalJob implements vscode.Disposable {
       TerminalJob.jobs.set(this.id, this);
       // The echoed command is part of the readable output so the in-memory
       // manager stays consistent with the persisted log file.
-      this.enqueueOutput(`$ ${config.command}\n`);
+      this.enqueueOutput(`$ ${config.command}\n`, false);
       if (ptyProcess) {
         this.initializePtyTerminal(ptyProcess);
       } else {
@@ -218,6 +249,7 @@ export class TerminalJob implements vscode.Disposable {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.monitorWatcher?.dispose();
     TerminalJob.jobs.delete(this.id);
     OutputManager.delete(this.id);
     TerminalJob.onDidDisposeEmitter.fire(this);
@@ -475,9 +507,17 @@ export class TerminalJob implements vscode.Disposable {
   private requestStop(reason: string): void {
     if (this.finished || this.stopRequested) return;
     this.stopRequested = true;
+    this.monitorEndReason ??= reason;
     logger.info(`Stopping terminal job ${this.id}: ${reason}`);
     if (this.ptyProcess) {
-      this.ptyProcess.kill();
+      if (this.monitorWatcher) {
+        this.monitorTermination = this.ptyProcess.killProcessGroup();
+        // A failed signal can leave the shell alive, so report the failure
+        // without relying on its exit callback to finalize the monitor.
+        void this.monitorTermination.catch(() => this.finalize(undefined));
+      } else {
+        this.ptyProcess.kill();
+      }
     } else {
       this.terminal?.dispose();
     }
@@ -501,13 +541,14 @@ export class TerminalJob implements vscode.Disposable {
     this.enqueueOutput(completeText);
   }
 
-  private enqueueOutput(text: string): void {
+  private enqueueOutput(text: string, monitorOutput = true): void {
     if (text.length === 0 || this.persistenceError) return;
     this.pendingOutputCharacters += text.length;
     this.updatePtyOutputFlowControl();
     const write = this.outputQueue.then(async () => {
       await this.outputWriter.append(text);
       this.outputManager.addChunk(text);
+      if (monitorOutput) this.monitorWatcher?.ingest(text);
     });
     this.outputQueue = write
       .catch((error) => {
@@ -565,6 +606,17 @@ export class TerminalJob implements vscode.Disposable {
     this.setVisible(false);
 
     let executionError = initialError ?? this.persistenceError;
+    let terminationFailed = false;
+    try {
+      // Shell exit does not imply group exit. Finish the monitor's TERM grace
+      // period and escalation before closing its transcript or reporting stop.
+      await this.monitorTermination;
+    } catch (error) {
+      terminationFailed = true;
+      executionError = ExecutionError.create(
+        error instanceof Error ? error.message : String(error),
+      );
+    }
     if (
       exitCode !== undefined &&
       exitCode !== 0 &&
@@ -597,13 +649,14 @@ export class TerminalJob implements vscode.Disposable {
     }
     this.outputManager.finalize(executionError);
 
-    const status =
-      this.stopRequested || executionError?.aborted
+    const status = terminationFailed
+      ? "failed"
+      : this.stopRequested || executionError?.aborted
         ? "stopped"
         : exitCode === 0 && !executionError
           ? "completed"
           : "failed";
-    TerminalJob.onDidFinishEmitter.fire({
+    const event: BackgroundJobTerminalEvent = {
       taskId: this.config.taskId,
       backgroundJobId: this.id,
       outputFile: this.outputFile,
@@ -612,12 +665,49 @@ export class TerminalJob implements vscode.Disposable {
       ...(exitCode !== undefined ? { exitCode } : {}),
       ...(executionError ? { error: executionError.message } : {}),
       finishedAt: Date.now(),
-    });
+    };
+    if (this.monitorWatcher) {
+      this.monitorWatcher.end();
+      this.emitMonitorEvent([], {
+        reason:
+          executionError?.message ??
+          this.monitorEndReason ??
+          `exited with code ${exitCode ?? "unknown"}`,
+        status,
+        ...(exitCode !== undefined ? { exitCode } : {}),
+      });
+    } else {
+      TerminalJob.onDidFinishEmitter.fire(event);
+    }
 
     this.dispose();
   }
 
+  private emitMonitorEvent(
+    lines: string[],
+    ended?: BackgroundMonitorNotification["ended"],
+    omittedLines?: number,
+  ): void {
+    const description = this.config.monitor?.description;
+    if (description === undefined) return;
+    TerminalJob.onDidMonitorEventEmitter.fire({
+      taskId: this.config.taskId,
+      event: {
+        kind: "monitor",
+        notificationId: crypto.randomUUID(),
+        backgroundJobId: this.id,
+        command: this.command,
+        outputFile: this.outputFile,
+        description,
+        lines,
+        ...(ended ? { ended } : {}),
+        ...(omittedLines ? { omittedLines } : {}),
+      },
+    });
+  }
+
   private cleanupAfterInitializationFailure(): void {
+    this.monitorWatcher?.dispose();
     TerminalJob.jobs.delete(this.id);
     OutputManager.delete(this.id);
     for (const disposable of this.disposables.splice(0)) {

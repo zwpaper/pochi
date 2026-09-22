@@ -58,6 +58,7 @@ export type BackgroundCommands = Record<
     isVisible: boolean;
     taskId?: string;
     command?: string;
+    monitor?: string;
     outputFile?: string;
   }
 >;

@@ -50,6 +50,15 @@ describe("CliRunningTaskAdaptor command ownership", () => {
       expect(rejected).toMatchObject({
         error: expect.stringContaining("not available"),
       });
+      const monitor = await adaptor.executeToolCall({
+        ...context,
+        toolName: "startMonitor",
+        toolCallId: randomUUID(),
+        input: { command: "echo forbidden", description: "fork monitor" },
+      });
+      expect(monitor).toMatchObject({
+        error: expect.stringContaining("Background monitors are not available"),
+      });
       const result = await adaptor.executeToolCall({
         ...context,
         toolCallId: randomUUID(),

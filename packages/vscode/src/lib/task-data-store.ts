@@ -1,7 +1,13 @@
-import { getLogger } from "@getpochi/common";
+import {
+  acknowledgeBackgroundJobNotification,
+  enqueueBackgroundJobNotification,
+  getLogger,
+  getPendingBackgroundJobNotifications,
+} from "@getpochi/common";
 import type {
   AutoMemoryTaskState,
   BackgroundJobNotification,
+  BackgroundJobNotificationQueueEntry,
   BackgroundTaskState,
   ContextWindowUsage,
   TaskMemoryState,
@@ -24,7 +30,7 @@ type TaskStateData = {
   taskMemoryState?: TaskMemoryState;
   autoMemoryState?: AutoMemoryTaskState;
   backgroundTaskState?: BackgroundTaskState;
-  backgroundJobNotifications?: BackgroundJobNotification[];
+  backgroundJobNotifications?: BackgroundJobNotificationQueueEntry[];
   // unix timestamp in milliseconds
   updatedAt: number;
 };
@@ -127,7 +133,10 @@ export class TaskDataStore {
         return;
       }
       await this.saveTaskState(taskId, {
-        backgroundJobNotifications: [...notifications, notification],
+        backgroundJobNotifications: enqueueBackgroundJobNotification(
+          notifications,
+          notification,
+        ),
       });
     },
   );
@@ -138,16 +147,19 @@ export class TaskDataStore {
       const notifications =
         this.state.value[taskId]?.backgroundJobNotifications ?? [];
       await this.saveTaskState(taskId, {
-        backgroundJobNotifications: notifications.filter(
-          (item) => item.notificationId !== notificationId,
+        backgroundJobNotifications: acknowledgeBackgroundJobNotification(
+          notifications,
+          notificationId,
         ),
       });
     },
   );
 
   getBackgroundJobNotificationsSignal(taskId: string) {
-    return computed(
-      () => this.state.value[taskId]?.backgroundJobNotifications ?? [],
+    return computed(() =>
+      getPendingBackgroundJobNotifications(
+        this.state.value[taskId]?.backgroundJobNotifications ?? [],
+      ),
     );
   }
 

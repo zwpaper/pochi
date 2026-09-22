@@ -1,4 +1,4 @@
-import type { BackgroundJobNotification } from "@getpochi/common";
+import type { BackgroundJobNotification, BackgroundMonitorNotification } from "@getpochi/common";
 import type {
   BackgroundCommands,
   ExecuteCommandResult,
@@ -85,7 +85,9 @@ function deliveredMessage(data: BackgroundJobNotification): Message {
 }
 
 describe("VS Code background command ownership", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
 
   it("passes fork background restrictions to the host", async () => {
     vi.mocked(vscodeHost.executeToolCall).mockResolvedValue({ output: "done" });
@@ -117,7 +119,7 @@ describe("VS Code background command ownership", () => {
     const running = signal<BackgroundCommands>({});
     const notifications = signal<BackgroundJobNotification[]>([]);
     const close = vi.fn(async () => {});
-    const acknowledge = vi.fn(async () => {});
+    const acknowledge = vi.fn(async (_id: string) => {});
     vi.mocked(vscodeHost.readBackgroundCommands).mockImplementation(
       async () => ({
         backgroundCommands: serializeThreadSignalWithSnapshot(running),
@@ -138,6 +140,42 @@ describe("VS Code background command ownership", () => {
     );
     return { running, notifications, close, acknowledge };
   }
+
+  it("delivers and acknowledges monitor batches and command completions through one subscription", async () => {
+    const { running, notifications, acknowledge, close } = setup();
+    acknowledge.mockImplementation(async (id) => {
+      notifications.value = notifications.value.filter((item) => item.notificationId !== id);
+    });
+    const store = makeStore();
+    const event: BackgroundMonitorNotification = { kind: "monitor" as const,
+      notificationId: "monitor-event", backgroundJobId: "bgjob-monitor-one", description: "CI", command: "watch CI", outputFile: "/tmp/monitor.log", lines: ["check passed"],
+    };
+    running.value = { [event.backgroundJobId]: { taskId: "child", command: event.command, monitor: event.description, outputFile: event.outputFile, isVisible: false } };
+    await store.manager.watchTask("child");
+    try {
+      const waiting = store.manager.wait("child", { wakeOnNotifications: true, timeoutMs: 1000 });
+      const completed = notification("command");
+      notifications.value = [event, completed];
+      expect(await waiting).toBe("notifications");
+      expect(store.manager.getPendingNotifications("child")).toEqual([event, completed]);
+      expect(store.manager.getJobsForTask("child")[0]).toMatchObject({ monitor: "CI", command: "watch CI", status: "running" });
+      expect(acknowledge).not.toHaveBeenCalled();
+      store.setMessages([deliveredMessage(event)]);
+      await expect.poll(() => acknowledge.mock.calls).toEqual([[event.notificationId]]);
+      expect(store.manager.getPendingNotifications("child")).toEqual([completed]);
+      store.setMessages([{ id: "delivered", role: "user", parts: [
+        { type: "data-background-job-notification", data: event },
+        { type: "data-background-job-notification", data: completed },
+      ] }]);
+      await expect.poll(() => acknowledge.mock.calls).toEqual([[event.notificationId], [completed.notificationId]]);
+      expect(store.manager.getPendingNotifications("child")).toEqual([]);
+      expect(vscodeHost.readBackgroundJobNotifications).toHaveBeenCalledExactlyOnceWith("child");
+      await store.manager.kill(event.backgroundJobId, "child");
+      expect(close).toHaveBeenCalledExactlyOnceWith(event.backgroundJobId);
+    } finally {
+      await store.dispose();
+    }
+  });
 
   it("waits through the exit-to-notification gap and acknowledges only persisted delivery", async () => {
     const { running, notifications, acknowledge } = setup();

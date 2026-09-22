@@ -17,6 +17,7 @@ import { isVSCodeEnvironment, vscodeHost } from "@/lib/vscode";
 import type { BackgroundJobNotification } from "@getpochi/common";
 import { parseTitle } from "@getpochi/common/message-utils";
 import type { ActiveSelection } from "@getpochi/common/vscode-webui-bridge";
+import { getBackgroundJobNotificationParts } from "@getpochi/livekit";
 import {
   Bell,
   CornerDownRight,
@@ -70,8 +71,8 @@ export const QueuedMessages: React.FC<QueuedMessagesProps> = ({
         isTodoMode,
         activeSelection,
       } = raw;
-      const notifications = parts.flatMap((part) =>
-        part.type === "data-background-job-notification" ? [part.data] : [],
+      const notifications = getBackgroundJobNotificationParts(parts).map(
+        (part) => part.data,
       );
       const isNotification = notifications.length > 0;
       const title = isNotification

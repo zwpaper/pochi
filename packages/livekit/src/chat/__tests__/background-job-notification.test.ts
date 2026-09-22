@@ -9,6 +9,8 @@ import {
   attachBackgroundJobNotificationParts,
   createBackgroundJobNotificationMessage,
   getBackgroundJobNotificationIds,
+  getBackgroundJobNotificationParts,
+  dedupeBackgroundJobNotificationParts,
   toBackgroundJobNotificationParts,
 } from "../background-job-notification";
 
@@ -116,5 +118,38 @@ it("normalizes persisted command notifications without a kind", () => {
   const parts = toBackgroundJobNotificationParts([{
     notificationId: "old:terminal", backgroundJobId: "old", outputFile: "/tmp/old.log", status: "completed", summary: "done", finishedAt: 1,
   } as BackgroundJobNotification]);
-  expect(parts[0].data.kind).toBe("command");
+  expect(parts[0]).toMatchObject({ type: "data-background-job-notification", data: { kind: "command" } });
+});
+
+describe("monitor notification format", () => {
+  const monitor = {
+    kind: "monitor" as const,
+    notificationId: "watch:first", backgroundJobId: "bgjob-monitor-watch",
+    description: "CI", command: "watch", outputFile: "/tmp/watch.log", lines: ["passed"],
+  };
+  const next = { ...monitor, notificationId: "watch:next", lines: ["finished"], ended: { reason: "done", status: "completed" as const } };
+  const history = toBackgroundJobNotificationParts([monitor, next]);
+
+  it("writes one canonical notification part per monitor batch", () => {
+    expect(toBackgroundJobNotificationParts([monitor, next])).toEqual([
+      { type: "data-background-job-notification", data: monitor },
+      { type: "data-background-job-notification", data: next },
+    ]);
+  });
+
+  it("selects notification parts without mutating the message or changing IDs", () => {
+    const messageParts: Message["parts"] = [history[0], { type: "text", text: "continue" }, history[1]];
+    const snapshot = structuredClone(messageParts);
+    expect(getBackgroundJobNotificationParts(messageParts)).toEqual(history);
+    expect(getBackgroundJobNotificationIds(messageParts)).toEqual(["watch:first", "watch:next"]);
+    expect(messageParts).toEqual(snapshot);
+  });
+
+  it("deduplicates monitor batches against delivered history while retaining new output", () => {
+    const newBatch = { ...monitor, notificationId: "watch:new" };
+    expect(dedupeBackgroundJobNotificationParts(
+      toBackgroundJobNotificationParts([monitor, next, newBatch, newBatch]),
+      history,
+    )).toEqual(toBackgroundJobNotificationParts([newBatch]));
+  });
 });

@@ -91,12 +91,12 @@ export class VscodeRunningTaskAdaptor implements RunningTaskAdaptor {
         await vscodeHost.readBackgroundJobNotifications(taskId);
       const controller = new AbortController();
       try {
-        const completed = await connectSignal(
+        const pending = await connectSignal(
           notifications.notifications,
           controller.signal,
         );
-        const unsubscribe = completed.subscribe(onChange);
-        onChange(completed.value);
+        const unsubscribe = pending.subscribe(onChange);
+        onChange(pending.value);
         return {
           dispose: () => {
             controller.abort();

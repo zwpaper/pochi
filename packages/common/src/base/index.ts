@@ -17,6 +17,21 @@ export {
 } from "./prompts";
 
 export {
+  MonitorWatcher,
+  type MonitorWatcherOptions,
+  type MonitorJobOptions,
+  MonitorBatchIntervalMs,
+  MonitorDefaultTimeoutMs,
+  MonitorMaxLinesPerBatch,
+  MonitorMaxBatchCharacters,
+} from "./monitor";
+export {
+  type BackgroundJobNotificationQueueEntry,
+  acknowledgeBackgroundJobNotification,
+  enqueueBackgroundJobNotification,
+  getPendingBackgroundJobNotifications,
+} from "./background-job-notification-queue";
+export {
   createBackgroundSubAgentStartedResult,
   getSubAgentBackgroundJobId,
   getSubAgentTaskId,

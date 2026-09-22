@@ -344,14 +344,33 @@ export class TaskRunner {
         getLLM: () => options.llm,
         getEffectiveContextWindow: () =>
           pochiConfig.value.effectiveContextWindow,
-        getEnvironment: async () => ({
-          ...(await readEnvironment({
+        getEnvironment: async () => {
+          const environment = await readEnvironment({
             cwd: options.cwd,
             omitCustomRules:
               options.isSubTask && options.customAgent?.omitAgentsMd === true,
-          })),
-          todos: this.todos,
-        }),
+          });
+          const monitors = this.adaptor.getActiveMonitors(this.taskId);
+          return {
+            ...environment,
+            workspace: {
+              ...environment.workspace,
+              ...(monitors.length > 0
+                ? {
+                    terminals: monitors.map(
+                      ({ backgroundJobId, description, outputFile }) => ({
+                        name: description,
+                        isActive: false,
+                        backgroundJobId,
+                        outputFile,
+                      }),
+                    ),
+                  }
+                : {}),
+            },
+            todos: this.todos,
+          };
+        },
         getCustomAgents: () => this.toolCallOptions.customAgents || [],
         getSkills: () => this.toolCallOptions.skills || [],
         ...(options.getAutoMemory
@@ -473,7 +492,12 @@ export class TaskRunner {
     const result = await this.backgroundJobs.wait(this.taskId, {
       timeoutMs: this.asyncWaitTimeoutInMs,
       abortSignal: this.abortSignal,
+      wakeOnNotifications: true,
     });
+    if (result === "notifications") {
+      spinner.succeed("Background notifications arrived.");
+      return true;
+    }
     if (result === "completed")
       spinner.succeed("All background jobs completed.");
     else {
@@ -483,8 +507,10 @@ export class TaskRunner {
           : "Background job wait was aborted.",
       );
       await this.backgroundJobs.stopOwnedJobs(this.taskId);
+      // Bounded process cleanup must publish final output before we flush it.
+      await this.adaptor.stopBackgroundCommands(this.taskId);
     }
-    return result !== "aborted";
+    return result !== "aborted" && !this.abortSignal?.aborted;
   }
 
   /**
@@ -506,10 +532,19 @@ export class TaskRunner {
       // background jobs would only delay handing the turn back to the user.
       // `flushBackgroundJobNotifications` enforces the same rule itself.
       if (!isAwaitingFollowupAnswer(lastMessage)) {
-        if (
-          this.asyncWaitTimeoutInMs > 0 &&
-          this.backgroundJobs.hasPending(this.taskId)
-        ) {
+        if (this.chatKit.flushBackgroundJobNotifications()) return "next";
+        const pendingNotifications =
+          this.backgroundJobs.getPendingNotifications(this.taskId);
+        const hasMonitorWork =
+          this.adaptor.getActiveMonitors(this.taskId).length > 0 ||
+          pendingNotifications.some((notice) => notice.kind === "monitor");
+        // Zero skips waiting for new output, but monitors still need bounded
+        // cleanup and may trigger final notification turns.
+        const shouldWaitForBackgroundWork =
+          (this.asyncWaitTimeoutInMs > 0 || hasMonitorWork) &&
+          (this.backgroundJobs.hasPending(this.taskId) ||
+            pendingNotifications.length > 0);
+        if (shouldWaitForBackgroundWork) {
           if (!(await this.waitForAsyncWork())) return "finished";
         }
         if (this.chatKit.flushBackgroundJobNotifications()) return "next";

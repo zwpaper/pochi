@@ -3,10 +3,16 @@ import path from "node:path";
 import type { Readable } from "node:stream";
 import { StringDecoder } from "node:string_decoder";
 import {
-  type BackgroundJobNotification,
+  type BackgroundJobNotificationQueueEntry,
   type BackgroundJobTerminalEvent,
+  type BackgroundMonitorNotification,
+  type MonitorJobOptions,
+  MonitorWatcher,
+  acknowledgeBackgroundJobNotification,
   createBackgroundJobNotification,
+  enqueueBackgroundJobNotification,
   getLogger,
+  getPendingBackgroundJobNotifications,
 } from "@getpochi/common";
 import { AutoMemoryManager } from "@getpochi/common/auto-memory/node";
 import { pochiConfig } from "@getpochi/common/configuration";
@@ -57,6 +63,12 @@ interface BackgroundCommand {
   stopRequested?: boolean;
   finalizing?: boolean;
   disposeAbort?: () => void;
+  monitor?: {
+    description: string;
+    watcher: MonitorWatcher;
+    endReason?: string;
+    termination?: Promise<void>;
+  };
 }
 
 const logger = getLogger("CliRunningTaskAdaptor");
@@ -106,7 +118,7 @@ export class CliRunningTaskAdaptor implements RunningTaskAdaptor {
   private readonly notificationListeners = new Map<string, Set<() => void>>();
   private readonly notifications = new Map<
     string,
-    { taskId: string; notification: BackgroundJobNotification }
+    BackgroundJobNotificationQueueEntry[]
   >();
   readonly commandAdaptor: BackgroundCommandAdaptor = {
     kill: async (id) => {
@@ -126,9 +138,9 @@ export class CliRunningTaskAdaptor implements RunningTaskAdaptor {
     observeNotifications: async (taskId, onChange) => {
       const update = () =>
         onChange(
-          [...this.notifications.values()]
-            .filter((entry) => entry.taskId === taskId)
-            .map((entry) => entry.notification),
+          getPendingBackgroundJobNotifications(
+            this.notifications.get(taskId) ?? [],
+          ),
         );
       let listeners = this.notificationListeners.get(taskId);
       if (!listeners) {
@@ -143,8 +155,16 @@ export class CliRunningTaskAdaptor implements RunningTaskAdaptor {
           if (!listeners.size) this.notificationListeners.delete(taskId);
         },
         acknowledge: async (id) => {
-          if (this.notifications.get(id)?.taskId !== taskId) return;
-          this.notifications.delete(id);
+          const queue = this.notifications.get(taskId) ?? [];
+          if (
+            !getPendingBackgroundJobNotifications(queue).some(
+              (item) => item.notificationId === id,
+            )
+          )
+            return;
+          const remaining = acknowledgeBackgroundJobNotification(queue, id);
+          if (remaining.length) this.notifications.set(taskId, remaining);
+          else this.notifications.delete(taskId);
           for (const notify of listeners) notify();
         },
       };
@@ -174,11 +194,26 @@ export class CliRunningTaskAdaptor implements RunningTaskAdaptor {
     return {
       getLLM: () => this.llm,
       getEffectiveContextWindow: () => pochiConfig.value.effectiveContextWindow,
-      getEnvironment: async () =>
-        readEnvironment({
+      getEnvironment: async () => {
+        const environment = await readEnvironment({
           cwd: context.cwd ?? this.cwd,
           omitCustomRules: context.omitCustomRules,
-        }),
+        });
+        return {
+          ...environment,
+          workspace: {
+            ...environment.workspace,
+            terminals: this.getActiveMonitors(context.taskId).map(
+              (monitor) => ({
+                name: monitor.description,
+                isActive: false,
+                backgroundJobId: monitor.backgroundJobId,
+                outputFile: monitor.outputFile,
+              }),
+            ),
+          },
+        };
+      },
       ...(this.projectMemoryEnabled
         ? {
             getAutoMemory: async () =>
@@ -331,6 +366,7 @@ export class CliRunningTaskAdaptor implements RunningTaskAdaptor {
           {
             taskId: job.taskId,
             command: job.command,
+            monitor: job.monitor?.description,
             outputFile: job.outputFile,
             isVisible: false,
           },
@@ -353,15 +389,24 @@ export class CliRunningTaskAdaptor implements RunningTaskAdaptor {
     command: string,
     cwd: string,
     envs?: Record<string, string>,
+    monitor?: MonitorJobOptions,
   ): { backgroundJobId: string; outputFile: string } {
     const child = spawn(command, {
       shell: getShellPath(),
       cwd,
       env: { ...process.env, ...getTerminalEnv(), ...envs },
       stdio: ["ignore", "pipe", "pipe"],
+      detached: monitor !== undefined && process.platform !== "win32",
     });
 
-    return this.registerBackgroundCommand(taskId, child, command);
+    return this.registerBackgroundCommand(
+      taskId,
+      child,
+      command,
+      undefined,
+      undefined,
+      monitor,
+    );
   }
 
   adoptBackgroundCommand(
@@ -386,8 +431,9 @@ export class CliRunningTaskAdaptor implements RunningTaskAdaptor {
     command: string,
     initialOutput: BackgroundJobInitialOutput = { stdout: [], stderr: [] },
     abortSignal?: AbortSignal,
+    monitor?: MonitorJobOptions,
   ): { backgroundJobId: string; outputFile: string } {
-    const id = createBackgroundJobId("command");
+    const id = createBackgroundJobId(monitor ? "monitor" : "command");
     const outputFile = this.options.commandOutputDir
       ? path.join(this.options.commandOutputDir, `${id}.log`)
       : getBackgroundJobOutputPath(taskId, id);
@@ -403,6 +449,20 @@ export class CliRunningTaskAdaptor implements RunningTaskAdaptor {
     };
 
     this.commands.set(id, job);
+    if (monitor) {
+      job.monitor = {
+        description: monitor.description,
+        watcher: new MonitorWatcher({
+          onEvents: (lines, omittedLines) =>
+            this.emitMonitorEvent(job, lines, undefined, omittedLines),
+          onTimeout: () => {
+            if (job.monitor) job.monitor.endReason = "killed after timeout";
+            this.killBackgroundCommand(id);
+          },
+          timeoutMs: monitor.timeoutMs,
+        }),
+      };
+    }
 
     let appendTail = Promise.resolve();
     const appendOutput = (chunk: string): Promise<void> => {
@@ -416,12 +476,17 @@ export class CliRunningTaskAdaptor implements RunningTaskAdaptor {
     const consumeOutput = async (
       stream: Readable | null,
       initialOutputStream: BackgroundJobInitialOutputStream,
+      isStdout: boolean,
     ) => {
+      const append = async (text: string) => {
+        await appendOutput(text);
+        if (isStdout) job.monitor?.watcher.ingest(text);
+      };
       const decoder = new StringDecoder("utf8");
       const sanitizer = new PlainOutputSanitizer();
       const initialOutputFinished = (async () => {
         for await (const chunk of initialOutputStream) {
-          await appendOutput(sanitizer.write(decoder.write(chunk)));
+          await append(sanitizer.write(decoder.write(chunk)));
         }
       })();
       const liveOutputFinished = stream
@@ -446,7 +511,7 @@ export class CliRunningTaskAdaptor implements RunningTaskAdaptor {
             const onData = (chunk: Buffer | string) => {
               stream.pause();
               liveOutputTail = liveOutputTail
-                .then(() => appendOutput(sanitizer.write(decoder.write(chunk))))
+                .then(() => append(sanitizer.write(decoder.write(chunk))))
                 .then(() => {
                   if (!settled) stream.resume();
                 });
@@ -474,27 +539,27 @@ export class CliRunningTaskAdaptor implements RunningTaskAdaptor {
       // manually stopped process may end in the middle of a character, so
       // discard that partial sequence instead of flushing it as U+FFFD.
       if (!job.stopRequested) {
-        await appendOutput(sanitizer.write(decoder.end()));
+        await append(sanitizer.write(decoder.end()));
       }
-      await appendOutput(sanitizer.end());
+      await append(sanitizer.end());
     };
 
     let outputError: unknown;
     const outputFinished = Promise.all([
-      consumeOutput(child.stdout, initialOutput.stdout),
-      consumeOutput(child.stderr, initialOutput.stderr),
+      consumeOutput(child.stdout, initialOutput.stdout, true),
+      consumeOutput(child.stderr, initialOutput.stderr, false),
     ])
       .finally(() => initialOutput.dispose?.())
       .catch((error) => {
         outputError = error;
-        child.kill();
+        this.killBackgroundCommand(job.id);
       });
 
     if (abortSignal) {
       const onAbort = () => {
         if (job.status !== "running" || job.finalizing) return;
         job.stopRequested = true;
-        child.kill();
+        this.killBackgroundCommand(job.id);
       };
       abortSignal.addEventListener("abort", onAbort, { once: true });
       job.disposeAbort = () =>
@@ -548,6 +613,18 @@ export class CliRunningTaskAdaptor implements RunningTaskAdaptor {
     let finalError = error;
 
     try {
+      // Shell exit does not imply group exit. Keep its children's TERM grace
+      // period and finish escalation before publishing an end event or exiting.
+      await job.monitor?.termination;
+    } catch (terminationError) {
+      finalStatus = "failed";
+      finalError =
+        terminationError instanceof Error
+          ? terminationError.message
+          : String(terminationError);
+    }
+
+    try {
       await job.outputWriter.close();
     } catch (closeError) {
       finalStatus = "failed";
@@ -558,6 +635,19 @@ export class CliRunningTaskAdaptor implements RunningTaskAdaptor {
     job.status = finalStatus;
     job.finalizing = false;
 
+    if (job.monitor) {
+      job.monitor.watcher.end();
+      this.emitMonitorEvent(job, [], {
+        reason:
+          finalError ??
+          job.monitor.endReason ??
+          `exited with code ${exitCode ?? "unknown"}`,
+        status: finalStatus,
+        ...(exitCode !== undefined ? { exitCode } : {}),
+      });
+      this.commandsChanged();
+      return;
+    }
     const event: BackgroundJobTerminalEvent = {
       taskId: job.taskId,
       backgroundJobId: job.id,
@@ -569,31 +659,136 @@ export class CliRunningTaskAdaptor implements RunningTaskAdaptor {
       finishedAt: Date.now(),
     };
     const notification = createBackgroundJobNotification(event);
-    this.notifications.set(notification.notificationId, {
-      taskId: job.taskId,
-      notification,
-    });
+    this.notifications.set(
+      job.taskId,
+      enqueueBackgroundJobNotification(
+        this.notifications.get(job.taskId) ?? [],
+        notification,
+      ),
+    );
     this.commandsChanged();
     for (const update of this.notificationListeners.get(job.taskId) ?? [])
       update();
+  }
+
+  private emitMonitorEvent(
+    job: BackgroundCommand,
+    lines: string[],
+    ended?: BackgroundMonitorNotification["ended"],
+    omittedLines?: number,
+  ) {
+    if (!job.monitor) return;
+    const notification: BackgroundMonitorNotification = {
+      kind: "monitor",
+      notificationId: crypto.randomUUID(),
+      backgroundJobId: job.id,
+      description: job.monitor.description,
+      command: job.command,
+      outputFile: job.outputFile,
+      lines,
+      ...(ended ? { ended } : {}),
+      ...(omittedLines ? { omittedLines } : {}),
+    };
+    this.notifications.set(
+      job.taskId,
+      enqueueBackgroundJobNotification(
+        this.notifications.get(job.taskId) ?? [],
+        notification,
+      ),
+    );
+    for (const update of this.notificationListeners.get(job.taskId) ?? [])
+      update();
+  }
+
+  getActiveMonitors(taskId: string) {
+    return [...this.commands.values()].flatMap((job) =>
+      job.taskId === taskId && job.monitor && job.status === "running"
+        ? [
+            {
+              backgroundJobId: job.id,
+              description: job.monitor.description,
+              outputFile: job.outputFile,
+            },
+          ]
+        : [],
+    );
   }
 
   private killBackgroundCommand(id: string): boolean {
     const job = this.commands.get(id);
     if (!job) return false;
     if (job.status !== "running" || job.finalizing) return true;
+    if (job.monitor?.termination) return true;
 
     job.stopRequested = true;
-    return job.process.kill();
+    if (!job.monitor) return job.process.kill("SIGTERM");
+    job.monitor.endReason ??= "kill requested";
+
+    const signal = (name: NodeJS.Signals | 0) => {
+      if (job.process.pid && process.platform !== "win32") {
+        try {
+          process.kill(-job.process.pid, name);
+          return true;
+        } catch (error) {
+          const code = (error as NodeJS.ErrnoException).code;
+          if (code === "ESRCH") return false;
+          // EPERM still means the group exists; on macOS it can be a zombie
+          // awaiting reaping. Keep polling instead of abandoning cleanup.
+          if (name === 0 && code === "EPERM") return true;
+          throw error;
+        }
+      }
+      if (job.process.exitCode !== null || job.process.signalCode !== null)
+        return false;
+      return name === 0 || job.process.kill(name);
+    };
+    const failed = (error: unknown) => {
+      logger.warn("Failed to terminate the monitor process group:", error);
+      return this.finalizeBackgroundCommand(
+        job,
+        "failed",
+        undefined,
+        error instanceof Error ? error.message : String(error),
+      );
+    };
+    try {
+      signal("SIGTERM");
+    } catch (error) {
+      void failed(error);
+      return false;
+    }
+
+    // This operation belongs to the group, not to the shell's close event.
+    // Polling also avoids retaining a delayed signal after the group is gone.
+    job.monitor.termination = (async () => {
+      const deadline = Date.now() + 1000;
+      while (signal(0)) {
+        const remaining = deadline - Date.now();
+        if (remaining <= 0) {
+          signal("SIGKILL");
+          return;
+        }
+        await new Promise<void>((resolve) =>
+          setTimeout(resolve, Math.min(50, remaining)),
+        );
+      }
+    })();
+    // A failed signal may leave the shell alive, so do not rely on close to
+    // consume this rejection and report the failure.
+    void job.monitor.termination.catch(failed);
+    return true;
   }
 
-  /** Stop any remaining CLI processes and let their output files finish closing. */
-  async stopBackgroundCommands(): Promise<void> {
-    for (const command of this.commands.values())
-      this.killBackgroundCommand(command.id);
+  /** Stop CLI processes and let their output files finish closing, within five seconds. */
+  async stopBackgroundCommands(taskId?: string): Promise<void> {
+    const commands = [...this.commands.values()].filter(
+      (command) => taskId === undefined || command.taskId === taskId,
+    );
+    for (const command of commands)
+      if (!command.stopRequested) this.killBackgroundCommand(command.id);
     const deadline = Date.now() + 5000;
     while (
-      [...this.commands.values()].some(
+      commands.some(
         (command) => command.status === "running" || command.finalizing,
       )
     ) {

@@ -50,6 +50,7 @@ import { executeCommand } from "@/tools/execute-command";
 import { globFiles } from "@/tools/glob-files";
 import { killBackgroundJob } from "@/tools/kill-background-job";
 import { listFiles as listFilesTool } from "@/tools/list-files";
+import { startMonitor } from "@/tools/monitor";
 import { readFile } from "@/tools/read-file";
 import { renderWidget } from "@/tools/render-widget";
 import { searchFiles } from "@/tools/search-files";
@@ -1573,6 +1574,7 @@ const ToolMap: Record<
   readFile,
   executeCommand,
   killBackgroundJob,
+  startMonitor,
   searchFiles,
   listFiles: listFilesTool,
   globFiles,
